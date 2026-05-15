@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CVE-2026-21530 - Vulnerability Report</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #ffffff;
+            color: #1a1a1a;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            border-bottom: 1px solid #e5e5e5;
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 2rem;
+        }
+
+        .header-left h1 {
+            font-size: 28px;
+            font-weight: 500;
+            margin: 0.5rem 0 1rem;
+            line-height: 1.2;
+            color: #1a1a1a;
+        }
+
+        .header-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+        }
+
+        .header-cve {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .cvss-badge {
+            background: #BA7517;
+            color: #FAEEDA;
+            padding: 1.25rem;
+            border-radius: 12px;
+            min-width: 120px;
+            text-align: center;
+            min-height: fit-content;
+        }
+
+        .cvss-badge.critical {
+            background: #E24B4A;
+            color: #FCEBEB;
+        }
+
+        .cvss-badge.high {
+            background: #D85A30;
+            color: #FAECE7;
+        }
+
+        .cvss-badge.low {
+            background: #639922;
+            color: #EAF3DE;
+        }
+
+        .cvss-badge-label {
+            font-size: 11px;
+            font-weight: 500;
+            opacity: 0.9;
+            margin-bottom: 0.5rem;
+        }
+
+        .cvss-badge-score {
+            font-size: 32px;
+            font-weight: 500;
+            line-height: 1;
+        }
+
+        .cvss-badge-severity {
+            font-size: 13px;
+            font-weight: 500;
+            margin-top: 0.5rem;
+        }
+
+        section {
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+            color: #1a1a1a;
+        }
+
+        h3 {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+            color: #1a1a1a;
+        }
+
+        .description {
+            font-size: 14px;
+            line-height: 1.7;
+            color: #666;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 2rem;
+        }
+
+        .info-card {
+            background: #f5f5f5;
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .info-card-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .info-card-value {
+            font-size: 15px;
+            font-weight: 500;
+            color: #1a1a1a;
+        }
+
+        .info-card-detail {
+            font-size: 12px;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+
+        .cvss-vector {
+            background: #f5f5f5;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .cvss-vector code {
+            font-size: 12px;
+            font-family: "Courier New", monospace;
+            color: #666;
+            word-break: break-all;
+            background: #fff;
+            padding: 0.75rem;
+            border-radius: 8px;
+            display: block;
+        }
+
+        .product-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .product-item {
+            background: #fff;
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .product-button {
+            width: 100%;
+            background: transparent;
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: left;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .product-button:hover {
+            border-color: #ccc;
+            background: #f9f9f9;
+        }
+
+        .product-name {
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: #1a1a1a;
+        }
+
+        .product-platforms {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .product-toggle {
+            font-size: 18px;
+            color: #666;
+        }
+
+        .product-details {
+            background: #f9f9f9;
+            border-left: 2px solid #378ADD;
+            padding: 1rem;
+            border-radius: 0 8px 8px 0;
+            font-size: 13px;
+            margin-top: -1px;
+        }
+
+        .version-range {
+            color: #1a1a1a;
+            font-family: "Courier New", monospace;
+            margin-bottom: 4px;
+        }
+
+        .cisa-assessment {
+            background: #f5f5f5;
+            padding: 1.25rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border-left: 4px solid #BA7517;
+        }
+
+        .cisa-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .cisa-item-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .cisa-item-value {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1a1a1a;
+        }
+
+        .references-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .reference-link {
+            display: block;
+            background: #fff;
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            padding: 1rem;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .reference-link:hover {
+            border-color: #378ADD;
+            background: #f9f9f9;
+        }
+
+        .reference-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #378ADD;
+            margin-bottom: 4px;
+        }
+
+        .reference-url {
+            font-size: 12px;
+            color: #666;
+            font-family: "Courier New", monospace;
+            word-break: break-all;
+        }
+
+        .reference-tags {
+            font-size: 11px;
+            color: #666;
+            margin-top: 6px;
+        }
+
+        .tag {
+            display: inline-block;
+            background: #f5f5f5;
+            padding: 2px 8px;
+            border-radius: 6px;
+            margin-right: 6px;
+            margin-bottom: 4px;
+        }
+
+        .footer {
+            border-top: 1px solid #e5e5e5;
+            padding-top: 1.5rem;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 22px !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <div class="header-label">Vulnerability Report</div>
+                <h1>Windows Rich Text Edit Elevation of Privilege Vulnerability</h1>
+                <div class="header-cve">CVE-2026-21530</div>
+            </div>
+            <div class="cvss-badge">
+                <div class="cvss-badge-label">CVSS v3.1</div>
+                <div class="cvss-badge-score">6.7</div>
+                <div class="cvss-badge-severity">Medium</div>
+            </div>
+        </div>
+
+        <!-- Description -->
+        <section>
+            <h2>Description</h2>
+            <p class="description">
+                Double free in Windows Rich Text Edit allows an authorized attacker to elevate privileges locally.
+            </p>
+        </section>
+
+        <!-- Key Information Grid -->
+        <div class="grid">
+            <div class="info-card">
+                <div class="info-card-label">CWE</div>
+                <div class="info-card-value">CWE-415</div>
+                <div class="info-card-detail">Double Free</div>
+            </div>
+
+            <div class="info-card">
+                <div class="info-card-label">Published</div>
+                <div class="info-card-value">May 12, 2026</div>
+                <div class="info-card-detail">Updated May 15, 2026</div>
+            </div>
+
+            <div class="info-card">
+                <div class="info-card-label">Affected Products</div>
+                <div class="info-card-value">22 products</div>
+                <div class="info-card-detail">Multiple Windows versions</div>
+            </div>
+
+            <div class="info-card">
+                <div class="info-card-label">Attack Vector</div>
+                <div class="info-card-value">Local</div>
+                <div class="info-card-detail">Requires interaction</div>
+            </div>
+        </div>
+
+        <!-- CVSS Vector -->
+        <div class="cvss-vector">
+            <h3>CVSS Vector</h3>
+            <code>CVSS:3.1/AV:L/AC:H/PR:L/UI:R/S:U/C:H/I:H/A:H/E:U/RL:O/RC:C</code>
+        </div>
+
+        <!-- Affected Products -->
+        <section>
+            <h2>Affected Products (22 total)</h2>
+            <div class="product-list">
+                <!-- Product 1 -->
+                <div class="product-item">
+                    <button class="product-button" onclick="toggleProduct(0)">
+                        <div>
+                            <div class="product-name">Windows 10 Version 1607</div>
+                            <div class="product-platforms">32-bit Systems, x64-based Systems</div>
+                        </div>
+                        <div class="product-toggle">+</div>
+                    </button>
+                    <div class="product-details hidden" id="details-0">
+                        <div style="margin-bottom: 0.75rem;">
+                            <div style="color: #666; font-weight: 500; margin-bottom: 4px;">Vulnerable Versions</div>
+                            <div class="version-range"><span style="color: #E24B4A;">≥</span> 10.0.14393.0 <span
+                                    style="color: #666;">→</span> <span style="color: #378ADD;">&lt;</span>
+                                10.0.14393.9140</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product 2 -->
+                <div class="product-item">
+                    <button class="product-button" onclick="toggleProduct(1)">
+                        <div>
+                            <div class="product-name">Windows 10 Version 1809</div>
+                            <div class="product-platforms">32-bit Systems, x64-based Systems</div>
+                        </div>
+                        <div class="product-toggle">+</div>
+                    </button>
+                    <div class="product-details hidden" id="details-1">
+                        <div style="margin-bottom: 0.75rem;">
+                            <div style="color: #666; font-weight: 500; margin-bottom: 4px;">Vulnerable Versions</div>
+                            <div class="version-range"><span style="color: #E24B4A;">≥</span> 10.0.17763.0 <span
+                                    style="color: #666;">→</span> <span style="color: #378ADD;">&lt;</span>
+                                10.0.17763.8755</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product 3 -->
+                <div class="product-item">
+                    <button class="product-button" onclick="toggleProduct(2)">
+                        <div>
+                            <div class="product-name">Windows Server 2019</div>
+                            <div class="product-platforms">x64-based Systems</div>
+                        </div>
+                        <div class="product-toggle">+</div>
+                    </button>
+                    <div class="product-details hidden" id="details-2">
+                        <div style="margin-bottom: 0.75rem;">
+                            <div style="color: #666; font-weight: 500; margin-bottom: 4px;">Vulnerable Versions</div>
+                            <div class="version-range"><span style="color: #E24B4A;">≥</span> 10.0.17763.0 <span
+                                    style="color: #666;">→</span> <span style="color: #378ADD;">&lt;</span>
+                                10.0.17763.8755</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product 4 -->
+                <div class="product-item">
+                    <button class="product-button" onclick="toggleProduct(3)">
+                        <div>
+                            <div class="product-name">Windows Server 2022</div>
+                            <div class="product-platforms">x64-based Systems</div>
+                        </div>
+                        <div class="product-toggle">+</div>
+                    </button>
+                    <div class="product-details hidden" id="details-3">
+                        <div style="margin-bottom: 0.75rem;">
+                            <div style="color: #666; font-weight: 500; margin-bottom: 4px;">Vulnerable Versions</div>
+                            <div class="version-range"><span style="color: #E24B4A;">≥</span> 10.0.20348.0 <span
+                                    style="color: #666;">→</span> <span style="color: #378ADD;">&lt;</span>
+                                10.0.20348.5139</div>
+                        </div>
+                    </div>
+                </div>
+
+                <p style="font-size: 13px; color: #666; margin-top: 1rem; text-align: center;">
+                    Showing 4 of 22 affected products. See Python parser for complete list.
+                </p>
+            </div>
+        </section>
+
+        <!-- CISA Assessment -->
+        <section>
+            <div class="cisa-assessment">
+                <h3>CISA Assessment</h3>
+                <div class="cisa-grid">
+                    <div>
+                        <div class="cisa-item-label">Exploitation</div>
+                        <div class="cisa-item-value">None</div>
+                    </div>
+                    <div>
+                        <div class="cisa-item-label">Automatable</div>
+                        <div class="cisa-item-value">No</div>
+                    </div>
+                    <div>
+                        <div class="cisa-item-label">Technical impact</div>
+                        <div class="cisa-item-value">Total</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- References -->
+        <section>
+            <h2>References</h2>
+            <div class="references-list">
+                <a href="https://msrc.microsoft.com/update-guide/vulnerability/CVE-2026-21530" target="_blank"
+                    class="reference-link">
+                    <div class="reference-name">Windows Rich Text Edit Elevation of Privilege Vulnerability ↗</div>
+                    <div class="reference-url">https://msrc.microsoft.com/update-guide/vulnerability/CVE-2026-21530
+                    </div>
+                    <div class="reference-tags">
+                        <span class="tag">vendor-advisory</span>
+                        <span class="tag">patch</span>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>This report was generated from official CVE records. For the most up-to-date information, please consult
+                the vendor advisory.</p>
+        </div>
+    </div>
+
+    <script>
+        function toggleProduct(index) {
+            const details = document.getElementById(`details-${index}`);
+            const button = event.target.closest('.product-button');
+            const toggle = button.querySelector('.product-toggle');
+
+            details.classList.toggle('hidden');
+            toggle.textContent = details.classList.contains('hidden') ? '+' : '−';
+        }
+    </script>
+</body>
+
+</html>

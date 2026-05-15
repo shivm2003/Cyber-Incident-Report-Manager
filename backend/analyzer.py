@@ -303,7 +303,16 @@ def check_heuristic_match(title: str, description: str, affected_products: list,
     """
     title_lower = title.lower()
     desc_lower = (description or "").lower()
-    tech_stack_lower = [t.lower() for t in tech_stack]
+    
+    # Handle both string and dict formats for tech_stack
+    tech_names = []
+    for t in tech_stack:
+        if isinstance(t, dict) and 'name' in t:
+            tech_names.append(t['name'])
+        elif isinstance(t, str):
+            tech_names.append(t)
+            
+    tech_stack_lower = [t.lower() for t in tech_names]
     products_lower = [p.lower() for p in (affected_products or [])]
     
     for tech in tech_stack_lower:
@@ -328,7 +337,16 @@ def analyze_dynamic_impact(title: str, description: str, profile: dict, engine: 
     tech_stack = profile.get("tech_stack", [])
     industry = profile.get("industry", "Technology")
     
-    tech_stack_str = ", ".join(tech_stack)
+    tech_stack_formatted = []
+    for t in tech_stack:
+        if isinstance(t, dict):
+            name = t.get('name', '')
+            version = t.get('version')
+            tech_stack_formatted.append(f"{name} (v{version})" if version else name)
+        else:
+            tech_stack_formatted.append(str(t))
+            
+    tech_stack_str = ", ".join(tech_stack_formatted)
 
     # 1. HURISTIC PART: Header Match
     if engine in ['all', 'heuristic']:
@@ -351,7 +369,7 @@ def analyze_dynamic_impact(title: str, description: str, profile: dict, engine: 
 
     # 2. AI PART: Gemma Map
     # Heuristic optimization: If description has direct matches, we boost the prompt
-    matched_tech = [t for t in tech_stack if t.lower() in (description or "").lower()]
+    matched_tech = [t for t in tech_stack_formatted if t.lower() in (description or "").lower()]
     
     prompt = f"""
     You are a Senior Cyber Threat Intelligence Analyst for '{company_name}'.

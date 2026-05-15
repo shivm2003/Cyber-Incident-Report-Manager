@@ -170,9 +170,13 @@ class CombinedReportResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class TechItem(BaseModel):
+    name: str
+    version: str | None = None
+
 class CompanyProfileBase(BaseModel):
     company_name: str
-    tech_stack: list[str]
+    tech_stack: list[TechItem | str | dict]
     industry: str
 
 class CompanyProfile(CompanyProfileBase):
@@ -186,3 +190,40 @@ class ReviewStatusUpdate(BaseModel):
     id: int
     type: str # 'incident' or 'cve'
     status: str # 'Pending', 'Reviewed', 'Dismissed'
+
+# --- MITRE API EXTRATOR SCHEMAS ---
+
+class MitreCWE(BaseModel):
+    id: str
+    description: str | None = None
+
+class MitreCVSS(BaseModel):
+    score: float | None = None
+    severity: str | None = None
+    version: str | None = None
+    vector: str | None = None
+
+class MitreAffectedVersion(BaseModel):
+    version: str | None = None
+    status: str | None = None
+    lessThan: str | None = None
+
+class MitreAffectedProduct(BaseModel):
+    vendor: str | None = None
+    product: str | None = None
+    platforms: list[str] | None = None
+    default_status: str | None = None
+    versions: list[MitreAffectedVersion] | None = None
+
+class MitreCVEReport(BaseModel):
+    cve_id: str
+    state: str | None = None
+    cna: str | None = None
+    published_date: str | None = None
+    updated_date: str | None = None
+    title: str | None = None
+    description: str | None = None
+    cwes: list[MitreCWE] | None = []
+    cvss: MitreCVSS | None = None
+    affected_products: list[MitreAffectedProduct] | None = []
+    references: list[str] | None = []

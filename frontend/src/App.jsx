@@ -30,6 +30,7 @@ import AuditLogs from './pages/AuditLogs';
 import CompanyRadar from './pages/CompanyRadar';
 import ManualReview from './pages/ManualReview';
 import TechInventory from './pages/TechInventory';
+import CVEReportViewer from './pages/CVEReportViewer';
 
 const API_BASE = 'http://localhost:8000/api';
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -110,7 +111,7 @@ function App() {
   const [companyProfile, setCompanyProfile] = useState({ company_name: "My Company", tech_stack: [], industry: "Finance" });
   const [reviewQueue, setReviewQueue] = useState({ incidents: [], cves: [] });
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [tempProfile, setTempProfile] = useState({ company_name: "", tech_stack_str: "", industry: "" });
+  const [tempProfile, setTempProfile] = useState({ company_name: "", tech_stack: [], industry: "" });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isReviewLoading, setIsReviewLoading] = useState(false);
 
@@ -124,6 +125,7 @@ function App() {
   const [cveSearch, setCveSearch] = useState('');
   const [manualCveId, setManualCveId] = useState('');
   const [pullingNvd, setPullingNvd] = useState(false);
+  const [extractorCveId, setExtractorCveId] = useState('');
   const [showCveFilters, setShowCveFilters] = useState(false);
   const [showAdvancedNvd, setShowAdvancedNvd] = useState(false);
   const [selectedCve, setSelectedCve] = useState(null);
@@ -552,7 +554,7 @@ function App() {
         industry: updatedData.industry
       } : {
         company_name: tempProfile.company_name,
-        tech_stack: tempProfile.tech_stack_str.split(',').map(s => s.trim()).filter(s => s),
+        tech_stack: tempProfile.tech_stack || [],
         industry: tempProfile.industry
       };
 
@@ -566,7 +568,7 @@ function App() {
         setCompanyProfile(data);
         setTempProfile({
           company_name: data.company_name,
-          tech_stack_str: data.tech_stack.join(', '),
+          tech_stack: data.tech_stack,
           industry: data.industry
         });
         setIsProfileModalOpen(false);
@@ -606,12 +608,14 @@ function App() {
       const allIncidentsData = await allIncidentsRes.json();
       const allCvesData = await allCvesRes.json();
 
-      const totalIncToScan = full ? allIncidentsData.length : allIncidentsData.filter(inc => !inc.company_impact_status || inc.company_impact_status === 'Pending').length;
-      const totalCvesToScan = full ? allCvesData.length : allCvesData.filter(cve => !cve.company_impact_reason).length;
+      const targetMethod = engine === 'heuristic' ? 'Heuristic' : engine === 'ai' ? 'AI Map' : null;
+
+      const totalIncToScan = full ? allIncidentsData.length : allIncidentsData.filter(inc => !inc.company_impact_status || inc.company_impact_status === 'Pending' || (targetMethod && inc.detection_method !== targetMethod)).length;
+      const totalCvesToScan = full ? allCvesData.length : allCvesData.filter(cve => !cve.company_impact_reason || (targetMethod && cve.detection_method !== targetMethod)).length;
       const totalToScan = totalIncToScan + totalCvesToScan;
 
       if (totalToScan === 0) {
-        alert("No new threats to scan.");
+        alert("No new threats to scan for this engine.");
         setCompanyScanning(false);
         return;
       }
@@ -634,13 +638,13 @@ function App() {
         const currentData = await checkIncRes.json();
         const currentCveData = await checkCveRes.json();
 
-        const incYes = currentData.filter(inc => inc.company_impact_status === 'Yes').length;
-        const incNo = currentData.filter(inc => inc.company_impact_status === 'No').length;
-        const incPending = currentData.filter(inc => !inc.company_impact_status || inc.company_impact_status === 'Pending').length;
+        const incYes = currentData.filter(inc => inc.company_impact_status === 'Yes' && (!targetMethod || inc.detection_method === targetMethod)).length;
+        const incNo = currentData.filter(inc => inc.company_impact_status === 'No' && (!targetMethod || inc.detection_method === targetMethod)).length;
+        const incPending = currentData.filter(inc => !inc.company_impact_status || inc.company_impact_status === 'Pending' || (targetMethod && inc.detection_method !== targetMethod)).length;
 
-        const cveYes = currentCveData.filter(cve => cve.company_impact_reason && cve.company_impact_score >= 70).length;
-        const cveNo = currentCveData.filter(cve => cve.company_impact_reason && cve.company_impact_score < 70).length;
-        const cvePending = currentCveData.filter(cve => !cve.company_impact_reason).length;
+        const cveYes = currentCveData.filter(cve => cve.company_impact_reason && cve.company_impact_score >= 70 && (!targetMethod || cve.detection_method === targetMethod)).length;
+        const cveNo = currentCveData.filter(cve => cve.company_impact_reason && cve.company_impact_score < 70 && (!targetMethod || cve.detection_method === targetMethod)).length;
+        const cvePending = currentCveData.filter(cve => !cve.company_impact_reason || (targetMethod && cve.detection_method !== targetMethod)).length;
 
         const threatsYes = incYes + cveYes;
         const threatsNo = incNo + cveNo;
@@ -749,6 +753,10 @@ function App() {
 
         <div className={`nav-item ${view === 'cves' ? 'active' : ''}`} onClick={() => setView('cves')}>
           <Database size={18} color={view === 'cves' ? '#a855f7' : 'inherit'} /> Vulnerability DB
+        </div>
+
+        <div className={`nav-item ${view === 'cve_extractor' ? 'active' : ''}`} onClick={() => setView('cve_extractor')}>
+          <Search size={18} color={view === 'cve_extractor' ? '#3b82f6' : 'inherit'} /> CVE Extractor
         </div>
 
         <div className={`nav-item ${view === 'audit' ? 'active' : ''}`} onClick={() => setView('audit')}>
@@ -910,6 +918,14 @@ function App() {
               cveDateTo={cveDateTo}
               setCveDateTo={setCveDateTo}
               handleCompanyScan={handleCompanyScan}
+              handleOpenExtractor={(id) => { setExtractorCveId(id); setView('cve_extractor'); }}
+            />
+          )}
+
+          {view === 'cve_extractor' && (
+            <CVEReportViewer 
+                extractorCveId={extractorCveId}
+                setExtractorCveId={setExtractorCveId}
             />
           )}
 

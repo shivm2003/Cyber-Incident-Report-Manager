@@ -354,6 +354,100 @@ def save_cve(cve_data: dict, db: Session = Depends(get_db)):
         from fastapi import HTTPException
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/cves/mitre/parse-and-save")
+def parse_and_save_mitre_cve(payload: dict, save: bool = True, db: Session = Depends(get_db)):
+    """Parses raw JSON CVE from MITRE using CVEParser. Optionally saves to local DB."""
+    from fastapi import HTTPException
+    import json
+    from datetime import datetime
+    import dateutil.parser
+    from Cve_parser import CVEParser
+    import dataclasses
+    
+    try:
+        raw_json = json.dumps(payload)
+        parser = CVEParser(raw_json)
+        report = parser.generate_report()
+        
+        # Convert dataclasses to dicts for JSON serialization
+        if 'affected' in report and 'products' in report['affected']:
+            report['affected']['products'] = [dataclasses.asdict(p) for p in report['affected']['products']]
+            
+        cve_id = report["metadata"]["cve_id"]
+        if not cve_id or cve_id == "N/A":
+            raise HTTPException(status_code=400, detail="Invalid CVE data provided")
+
+        existing_cve = db.query(models.CVE).filter(models.CVE.cve_id == cve_id.upper()).first()
+        
+        # Determine primary vendor and product
+        primary_vendor = None
+        primary_product = None
+        if report.get("affected") and report["affected"].get("products") and len(report["affected"]["products"]) > 0:
+            first_prod = report["affected"]["products"][0]
+            primary_vendor = first_prod.get("vendor")
+            primary_product = first_prod.get("product")
+
+        # Auto-heal existing record even if not fully saving
+        if existing_cve and not save:
+            healed = False
+            if not existing_cve.company_name and primary_vendor:
+                existing_cve.company_name = primary_vendor
+                healed = True
+            if not existing_cve.product_name and primary_product:
+                existing_cve.product_name = primary_product
+                healed = True
+            if healed:
+                db.commit()
+
+        if not save:
+            return {"status": "success", "report": report}
+            
+        # Save to DB (Full save)
+        if not existing_cve:
+            existing_cve = models.CVE(cve_id=cve_id.upper())
+            db.add(existing_cve)
+            
+        existing_cve.description = report["vulnerability"]["description"]
+        if report["scoring"]["cvss_score"]:
+            existing_cve.cvss_score = str(report["scoring"]["cvss_score"])
+        if report["scoring"]["cvss_severity"]:
+            existing_cve.severity = report["scoring"]["cvss_severity"].capitalize()
+            
+        if not existing_cve.company_name and primary_vendor:
+            existing_cve.company_name = primary_vendor
+        if not existing_cve.product_name and primary_product:
+            existing_cve.product_name = primary_product
+            
+        # Format affected products simply
+        affected_list = []
+        for p in report["affected"]["products"]:
+            affected_list.append(f"{p['vendor']} {p['product']}")
+        existing_cve.affected_products = affected_list
+        
+        # References
+        existing_cve.references = [r["url"] for r in report["references"]]
+        
+        # Dates
+        try:
+            if report["metadata"]["date_published"] and report["metadata"]["date_published"] != "N/A":
+                existing_cve.published_date = dateutil.parser.isoparse(report["metadata"]["date_published"]).replace(tzinfo=None)
+            if report["metadata"]["date_updated"] and report["metadata"]["date_updated"] != "N/A":
+                existing_cve.last_modified_date = dateutil.parser.isoparse(report["metadata"]["date_updated"]).replace(tzinfo=None)
+        except Exception as date_e:
+            print(f"Date parsing error: {date_e}")
+            
+        existing_cve.pull_type = "MITRE Extractor"
+        existing_cve.raw_data = payload
+        
+        db.commit()
+        db.refresh(existing_cve)
+        
+        return {"status": "success", "report": report, "db_id": existing_cve.id}
+        
+    except Exception as e:
+        print(f"Error parsing/saving MITRE CVE: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to process CVE: {str(e)}")
+
 @app.get("/api/map-data")
 def get_map_data(db: Session = Depends(get_db)):
     """Provides incident data aggregated by country for the world map."""
@@ -493,7 +587,11 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             
         query = db.query(models.Incident)
         if not full_scan:
-            query = query.filter(models.Incident.company_impact_status == None)
+            target_method = "Heuristic" if engine == "heuristic" else "AI Map" if engine == "ai" else None
+            if target_method:
+                query = query.filter((models.Incident.company_impact_status == None) | (models.Incident.detection_method != target_method))
+            else:
+                query = query.filter(models.Incident.company_impact_status == None)
         
         incidents = query.offset(offset).limit(50).all()
         if not incidents: break
@@ -529,7 +627,11 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             
         query = db.query(models.CVE)
         if not full_scan:
-            query = query.filter(models.CVE.company_impact_reason == None)
+            target_method = "Heuristic" if engine == "heuristic" else "AI Map" if engine == "ai" else None
+            if target_method:
+                query = query.filter((models.CVE.company_impact_reason == None) | (models.CVE.detection_method != target_method))
+            else:
+                query = query.filter(models.CVE.company_impact_reason == None)
         
         cves = query.offset(offset).limit(50).all()
         if not cves: break
@@ -587,7 +689,7 @@ def update_company_profile(req: schemas.CompanyProfileBase, db: Session = Depend
         db.add(profile)
     
     profile.company_name = req.company_name
-    profile.tech_stack = req.tech_stack
+    profile.tech_stack = [t.model_dump() if hasattr(t, 'model_dump') else t.dict() if hasattr(t, 'dict') else t for t in req.tech_stack]
     profile.industry = req.industry
     profile.last_updated = datetime.datetime.utcnow()
     

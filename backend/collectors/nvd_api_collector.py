@@ -90,7 +90,7 @@ def fetch_nvd_cves(db: Session, timeframe: str = "today"):
     params = {
         "pubStartDate": start_date,
         "pubEndDate": end_date,
-        "resultsPerPage": 100 # Pull a good batch
+        "resultsPerPage": 2000 # Increased to pull max allowed per batch
     }
     
     try:
@@ -224,6 +224,10 @@ def fetch_nvd_advanced(db: Session, search_params: dict):
         else:
             params[k] = v
 
+    # Force max limit per API rules
+    if 'resultsPerPage' not in params:
+        params['resultsPerPage'] = 2000
+        
     # VALIDATION: NVD API v2.0 limits date ranges to 120 days
     if search_params.get('pubStartDate') and search_params.get('pubEndDate'):
         try:
