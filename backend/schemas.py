@@ -150,6 +150,7 @@ class ReportBuilderPreviewRequest(BaseModel):
     from_date: str
     to_date: str
     data_sources: list[str] # ['crawl', 'cve']
+    impact_only: bool = False
 
 class CombinedReportCreate(BaseModel):
     report_title: str

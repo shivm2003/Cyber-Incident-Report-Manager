@@ -91,7 +91,8 @@ function App() {
   const [reportBuilderFilters, setReportBuilderFilters] = useState({
     from_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     to_date: new Date().toISOString().split('T')[0],
-    sources: ['crawl', 'cve']
+    sources: ['crawl', 'cve'],
+    impact_only: false
   });
   const [reportBuilderTitle, setReportBuilderTitle] = useState('Custom Intelligence Report');
   const [reportBuilderPreviewLoading, setReportBuilderPreviewLoading] = useState(false);
@@ -328,7 +329,8 @@ function App() {
         body: JSON.stringify({
           from_date: reportBuilderFilters.from_date,
           to_date: reportBuilderFilters.to_date,
-          data_sources: reportBuilderFilters.sources
+          data_sources: reportBuilderFilters.sources,
+          impact_only: reportBuilderFilters.impact_only
         })
       });
       const data = await res.json();

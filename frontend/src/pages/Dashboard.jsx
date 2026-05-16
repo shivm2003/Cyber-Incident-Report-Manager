@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   ShieldAlert, Activity, Globe, MapPin, Search, Filter, 
-  RotateCcw, X, Zap, RefreshCw, FileText, Database
+  RotateCcw, X, Zap, RefreshCw, FileText, Database, AlertOctagon
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -231,6 +231,11 @@ const Dashboard = ({
                       <Zap size={10} fill="#a855f7" /> REPORT AI IMPACT
                     </div>
                   )}
+                  {inc.company_impact_status === 'Yes' && (
+                    <div style={{ fontSize: '10px', fontWeight: 900, color: '#ef4444', letterSpacing: '1px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239, 68, 68, 0.1)', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.2)', width: 'fit-content' }}>
+                      <AlertOctagon size={12} fill="rgba(239, 68, 68, 0.2)" /> 🚨 COMPANY IMPACT DETECTED ({inc.detection_method?.toUpperCase() || 'UNKNOWN'})
+                    </div>
+                  )}
                   <div style={{ fontWeight: 600 }}>{inc.title}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                     {intelMode === 'gemma' ? (
@@ -261,17 +266,17 @@ const Dashboard = ({
                         return (
                           <button
                             className="btn-ghost"
-                            style={{ fontSize: '10px', color: '#10b981', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '6px 12px', fontWeight: 800 }}
+                            style={{ fontSize: '10px', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', fontWeight: 800 }}
                             onClick={(e) => { e.stopPropagation(); setActiveReport(existingReport); setView('impact'); }}
                           >
-                            <FileText size={12} style={{ marginRight: '6px' }} /> View Analysis
+                            <FileText size={12} style={{ marginRight: '6px' }} /> View Report
                           </button>
                         );
                       } else {
                         return (
                           <button
                             className="btn-ghost"
-                            style={{ fontSize: '10px', color: '#a855f7', fontWeight: 800, background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.2)', padding: '6px 12px', opacity: generatingReport === inc.id ? 0.7 : 1 }}
+                            style={{ fontSize: '10px', color: 'var(--text-main)', border: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)', padding: '6px 12px', fontWeight: 800 }}
                             onClick={(e) => { e.stopPropagation(); handleGenerateImpact(inc.id); }}
                             disabled={generatingReport === inc.id}
                           >
@@ -307,14 +312,14 @@ const Dashboard = ({
                   <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(inc.date_collected).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                 </td>
                 <td style={{ textAlign: 'center' }}>
-                  {inc.company_impact_status && inc.detection_method === 'Heuristic' ? (
+                  {inc.company_impact_status === 'Yes' && inc.detection_method === 'Heuristic' ? (
                     <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 800, background: 'rgba(16, 185, 129, 0.1)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>True</span>
                   ) : (
                     <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>False</span>
                   )}
                 </td>
                 <td style={{ textAlign: 'center' }}>
-                  {inc.company_impact_status && inc.detection_method === 'AI Map' ? (
+                  {inc.company_impact_status === 'Yes' && inc.detection_method === 'AI Map' ? (
                     <span style={{ fontSize: '10px', color: '#818cf8', fontWeight: 800, background: 'rgba(99, 102, 241, 0.1)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(99, 102, 241, 0.2)' }}>True</span>
                   ) : (
                     <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>False</span>

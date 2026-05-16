@@ -971,6 +971,8 @@ def preview_report_data(req: schemas.ReportBuilderPreviewRequest, db: Session = 
     try:
         from_dt = datetime.fromisoformat(req.from_date.replace('Z', '+00:00'))
         to_dt = datetime.fromisoformat(req.to_date.replace('Z', '+00:00'))
+        # Adjust to_dt to the end of the day to ensure we capture all events on that day
+        to_dt = to_dt.replace(hour=23, minute=59, second=59)
     except:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Invalid date format. Use ISO 8601.")
@@ -981,17 +983,23 @@ def preview_report_data(req: schemas.ReportBuilderPreviewRequest, db: Session = 
     }
 
     if 'crawl' in req.data_sources:
-        incidents = db.query(models.Incident).filter(
+        query = db.query(models.Incident).filter(
             models.Incident.happened_at >= from_dt,
             models.Incident.happened_at <= to_dt
-        ).all()
+        )
+        if req.impact_only:
+            query = query.filter(models.Incident.company_impact_status == 'Yes')
+        incidents = query.all()
         results["incidents"] = incidents
 
     if 'cve' in req.data_sources:
-        cves = db.query(models.CVE).filter(
+        query = db.query(models.CVE).filter(
             models.CVE.published_date >= from_dt,
             models.CVE.published_date <= to_dt
-        ).all()
+        )
+        if req.impact_only:
+            query = query.filter(models.CVE.impact_flag == 1)
+        cves = query.all()
         results["cves"] = cves
 
     return results

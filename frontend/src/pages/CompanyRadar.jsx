@@ -354,19 +354,23 @@ const CompanyRadar = ({
               <Server size={16} color="#3b82f6" /> Inventory State
             </h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {companyProfile.tech_stack.map((tech, idx) => (
-                <span key={idx} style={{ 
-                  fontSize: '11px', 
-                  fontWeight: 600,
-                  background: 'rgba(59, 130, 246, 0.1)', 
-                  color: '#60a5fa',
-                  padding: '4px 10px', 
-                  borderRadius: '6px', 
-                  border: '1px solid rgba(59, 130, 246, 0.2)' 
-                }}>
-                  {tech}
-                </span>
-              ))}
+              {companyProfile.tech_stack.map((tech, idx) => {
+                const name = typeof tech === 'string' ? tech : tech.name;
+                const version = typeof tech === 'object' && tech.version ? ` (v${tech.version})` : '';
+                return (
+                  <span key={idx} style={{ 
+                    fontSize: '11px', 
+                    fontWeight: 600,
+                    background: 'rgba(59, 130, 246, 0.1)', 
+                    color: '#60a5fa',
+                    padding: '4px 10px', 
+                    borderRadius: '6px', 
+                    border: '1px solid rgba(59, 130, 246, 0.2)' 
+                  }}>
+                    {name}{version}
+                  </span>
+                );
+              })}
               {companyProfile.tech_stack.length === 0 && (
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '10px', width: '100%', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
                   No technologies configured in inventory.
