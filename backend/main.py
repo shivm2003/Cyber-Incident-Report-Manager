@@ -578,6 +578,7 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
     global SCAN_CANCEL_REQUESTED
     SCAN_CANCEL_REQUESTED = False
     from analyzer import analyze_dynamic_impact, analyze_cve_impact
+    import datetime
     
     # Fetch company profile
     profile_obj = db.query(models.CompanyProfile).first()
@@ -591,6 +592,57 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             "industry": profile_obj.industry
         }
 
+    # Determine scan iteration
+    latest_scan = db.query(models.ScanHistory).order_by(models.ScanHistory.iteration.desc()).first()
+    current_iteration = (latest_scan.iteration + 1) if latest_scan else 1
+    
+    # Create scan history record
+    scan_record = models.ScanHistory(
+        iteration=current_iteration,
+        scan_type='full' if full_scan else 'new',
+        status='running'
+    )
+    db.add(scan_record)
+    db.commit()
+    db.refresh(scan_record)
+    
+    print(f"[+] Starting scan iteration #{current_iteration} ({'Full' if full_scan else 'New Only'})")
+    
+    # If this is iteration 3+, purge the oldest iteration (keep last 2)
+    if full_scan and current_iteration >= 3:
+        purge_iteration = current_iteration - 2
+        print(f"[*] Purging scan iteration #{purge_iteration} (keeping last 2 iterations)")
+        
+        # Clear impact data for incidents from the oldest iteration
+        old_incidents = db.query(models.Incident).filter(models.Incident.scan_iteration == purge_iteration).all()
+        for inc in old_incidents:
+            inc.company_impact_status = None
+            inc.company_impact_reason = None
+            inc.company_impact_score = 0
+            inc.impact_flag = 0
+            inc.detection_method = None
+            inc.scan_iteration = 0
+            inc.review_status = "Pending"
+        
+        # Clear impact data for CVEs from the oldest iteration
+        old_cves = db.query(models.CVE).filter(models.CVE.scan_iteration == purge_iteration).all()
+        for cve in old_cves:
+            cve.company_impact_score = 0
+            cve.company_impact_reason = None
+            cve.impact_flag = 0
+            cve.detection_method = None
+            cve.scan_iteration = 0
+            cve.review_status = "Pending"
+        
+        # Remove old scan history record
+        db.query(models.ScanHistory).filter(models.ScanHistory.iteration == purge_iteration).delete()
+        db.commit()
+        print(f"[+] Purged {len(old_incidents)} incidents and {len(old_cves)} CVEs from iteration #{purge_iteration}")
+
+    inc_scanned = 0
+    inc_threats = 0
+    inc_no_impact = 0
+
     # 1. SCAN INCIDENTS
     offset = 0
     while True:
@@ -600,11 +652,7 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             
         query = db.query(models.Incident)
         if not full_scan:
-            target_method = "Heuristic" if engine == "heuristic" else None
-            if target_method:
-                query = query.filter((models.Incident.company_impact_status == None) | (models.Incident.detection_method != target_method))
-            else:
-                query = query.filter(models.Incident.company_impact_status == None)
+            query = query.filter(models.Incident.company_impact_status == None)
         
         incidents = query.offset(offset).limit(50).all()
         if not incidents: break
@@ -619,17 +667,25 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             incident.company_impact_reason = res["reason"]
             incident.company_impact_score = res["score"]
             incident.detection_method = res.get("method", "Heuristic (Version-Aware)")
+            incident.scan_iteration = current_iteration
             # Flag for manual review if score is high
             if res["score"] >= 70:
                 incident.impact_flag = 1
                 incident.review_status = "Pending"
+                inc_threats += 1
             else:
                 incident.impact_flag = 0
                 incident.review_status = "Reviewed" # Auto-reviewed if low
+                inc_no_impact += 1
+            inc_scanned += 1
             db.commit()
             
         if full_scan:
             offset += 50
+
+    cve_scanned = 0
+    cve_threats = 0
+    cve_no_impact = 0
 
     # 2. SCAN CVES
     offset = 0
@@ -640,11 +696,7 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             
         query = db.query(models.CVE)
         if not full_scan:
-            target_method = "Heuristic" if engine == "heuristic" else None
-            if target_method:
-                query = query.filter((models.CVE.company_impact_reason == None) | (models.CVE.detection_method != target_method))
-            else:
-                query = query.filter(models.CVE.company_impact_reason == None)
+            query = query.filter(models.CVE.company_impact_reason == None)
         
         cves = query.offset(offset).limit(50).all()
         if not cves: break
@@ -658,18 +710,31 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             cve.company_impact_score = res["score"]
             cve.company_impact_reason = res["reason"]
             cve.detection_method = res.get("method", "Heuristic (Version-Aware)")
+            cve.scan_iteration = current_iteration
             if res["score"] >= 70:
                 cve.impact_flag = 1
                 cve.review_status = "Pending"
+                cve_threats += 1
             else:
                 cve.impact_flag = 0
                 cve.review_status = "Reviewed"
+                cve_no_impact += 1
+            cve_scanned += 1
             db.commit()
         
         if full_scan:
             offset += 50
             
-    print("[+] Company impact scan complete!")
+    # Update scan history record
+    scan_record.incidents_scanned = inc_scanned
+    scan_record.cves_scanned = cve_scanned
+    scan_record.threats_found = inc_threats + cve_threats
+    scan_record.threats_no_impact = inc_no_impact + cve_no_impact
+    scan_record.completed_at = datetime.datetime.utcnow()
+    scan_record.status = "canceled" if SCAN_CANCEL_REQUESTED else "completed"
+    db.commit()
+    
+    print(f"[+] Scan iteration #{current_iteration} complete! Threats: {inc_threats + cve_threats}, No Impact: {inc_no_impact + cve_no_impact}")
 
 @app.post("/api/scan-company-impact")
 def scan_company_impact(background_tasks: BackgroundTasks, full: bool = False, engine: str = 'all', db: Session = Depends(get_db)):
@@ -683,6 +748,22 @@ def stop_company_impact_scan():
     global SCAN_CANCEL_REQUESTED
     SCAN_CANCEL_REQUESTED = True
     return {"status": "Scan stop requested"}
+
+@app.get("/api/scan-history")
+def get_scan_history(db: Session = Depends(get_db)):
+    scans = db.query(models.ScanHistory).order_by(models.ScanHistory.iteration.desc()).limit(5).all()
+    return [{
+        "id": s.id,
+        "iteration": s.iteration,
+        "scan_type": s.scan_type,
+        "incidents_scanned": s.incidents_scanned,
+        "cves_scanned": s.cves_scanned,
+        "threats_found": s.threats_found,
+        "threats_no_impact": s.threats_no_impact,
+        "started_at": s.started_at.isoformat() if s.started_at else None,
+        "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+        "status": s.status
+    } for s in scans]
 
 @app.get("/api/company-profile", response_model=schemas.CompanyProfile)
 def get_company_profile(db: Session = Depends(get_db)):

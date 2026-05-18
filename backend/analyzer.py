@@ -330,36 +330,15 @@ def check_heuristic_match(title: str, description: str, affected_products: list,
 
 def analyze_dynamic_impact(title: str, description: str, profile: dict, engine: str = 'all') -> dict:
     """
-    Dynamic Intelligence Engine v4.0:
-    Tier 1: Heuristic (exact string match) — instant, deterministic.
-    Tier 2: Version Extractor (regex version range/wildcard/operator comparison) — fast, deterministic.
-    AI Engine has been removed.
+    Unified Heuristic Engine v5.0 (Version-Aware):
+    Single pass: exact string match + version range/wildcard/operator comparison.
+    No AI engine. Pure deterministic scanning.
     """
     from version_engine import scan_threat_version_aware
     
     tech_stack = profile.get("tech_stack", [])
     industry = profile.get("industry", "Technology")
     
-    # TIER 1: Original Heuristic — exact string match (untouched)
-    if engine in ['all', 'heuristic']:
-        h_match = check_heuristic_match(title, description, [], tech_stack)
-        if h_match:
-            return {
-                "status": "Yes",
-                "score": 100,
-                "reason": f"Heuristic Match: Exact technical asset '{h_match}' detected in incident header.",
-                "method": "Heuristic"
-            }
-        
-        if engine == 'heuristic':
-            return {
-                "status": "No",
-                "score": 0,
-                "reason": "Deterministic scan found no exact matches in the asset inventory.",
-                "method": "Heuristic"
-            }
-
-    # TIER 2: Version Extractor — regex-based version range/wildcard/operator matching
     result = scan_threat_version_aware(
         title=title,
         description=description or "",
@@ -377,36 +356,15 @@ def analyze_dynamic_impact(title: str, description: str, profile: dict, engine: 
 
 def analyze_cve_impact(cve_id: str, description: str, affected_products: list, profile: dict, engine: str = 'all') -> dict:
     """
-    CVE Impact Analysis v4.0:
-    Tier 1: Heuristic (exact string match against affected products).
-    Tier 2: Version Extractor (version range/wildcard/operator comparison).
-    AI Engine has been removed.
+    CVE Heuristic Engine v5.0 (Version-Aware):
+    Single pass: exact string match + version range/wildcard/operator comparison.
+    No AI engine. Pure deterministic scanning.
     """
     from version_engine import scan_threat_version_aware
     
     tech_stack = profile.get("tech_stack", [])
     industry = profile.get("industry", "Technology")
     
-    # TIER 1: Original Heuristic — exact string match (untouched)
-    if engine in ['all', 'heuristic']:
-        h_match = check_heuristic_match(f"CVE Vulnerability: {cve_id}", description, affected_products, tech_stack)
-        if h_match:
-            return {
-                "status": "Yes",
-                "score": 100,
-                "reason": f"Heuristic Match: Exact technical asset '{h_match}' detected in NVD headers.",
-                "method": "Heuristic"
-            }
-            
-        if engine == 'heuristic':
-            return {
-                "status": "No",
-                "score": 0,
-                "reason": "Deterministic scan found no exact matches in the asset inventory.",
-                "method": "Heuristic"
-            }
-    
-    # TIER 2: Version Extractor
     result = scan_threat_version_aware(
         title=f"CVE Vulnerability: {cve_id}",
         description=description or "",

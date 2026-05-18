@@ -226,8 +226,7 @@ const Dashboard = ({
               <th>Entity</th>
               <th>Incident Date</th>
               <th>Collected At</th>
-              <th style={{ textAlign: 'center' }}>Heuristic Scan</th>
-              <th style={{ textAlign: 'center' }}>Version Scan</th>
+              <th style={{ textAlign: 'center' }}>Impact Radar</th>
               <th style={{ textAlign: 'center' }}>Actions</th>
             </tr>
           </thead>
@@ -331,17 +330,19 @@ const Dashboard = ({
                   <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(inc.date_collected).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                 </td>
                 <td style={{ textAlign: 'center' }}>
-                  {inc.company_impact_status === 'Yes' && inc.detection_method === 'Heuristic' ? (
-                    <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 800, background: 'rgba(16, 185, 129, 0.1)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>True</span>
+                  {inc.company_impact_status === 'Yes' ? (
+                    <span style={{ 
+                      fontSize: '9px', fontWeight: 800, 
+                      background: inc.detection_method?.includes('Version') ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
+                      color: inc.detection_method?.includes('Version') ? '#f59e0b' : '#10b981', 
+                      padding: '4px 8px', borderRadius: '4px', 
+                      border: `1px solid ${inc.detection_method?.includes('Version') ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
+                      textTransform: 'uppercase'
+                    }}>
+                      {inc.detection_method || 'Heuristic'}
+                    </span>
                   ) : (
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>False</span>
-                  )}
-                </td>
-                <td style={{ textAlign: 'center' }}>
-                  {inc.company_impact_status === 'Yes' && inc.detection_method && inc.detection_method.includes('Version') ? (
-                    <span style={{ fontSize: '10px', color: '#f59e0b', fontWeight: 800, background: 'rgba(245, 158, 11, 0.1)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>True</span>
-                  ) : (
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>False</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>—</span>
                   )}
                 </td>
                 <td>

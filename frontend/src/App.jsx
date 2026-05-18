@@ -115,6 +115,7 @@ function App() {
   const [tempProfile, setTempProfile] = useState({ company_name: "", tech_stack: [], industry: "" });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isReviewLoading, setIsReviewLoading] = useState(false);
+  const [scanHistory, setScanHistory] = useState([]);
 
   // CVE Vulnerability Database Filters
   const [cveSortOrder, setCveSortOrder] = useState('desc');
@@ -526,6 +527,16 @@ function App() {
     finally { setIsReviewLoading(false); }
   }, []);
 
+  const loadScanHistory = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/scan-history`);
+      if (res.ok) {
+        const data = await res.json();
+        setScanHistory(data);
+      }
+    } catch (e) { console.error("Load scan history failed:", e); }
+  }, []);
+
   useEffect(() => {
     (async () => {
       await loadData();
@@ -534,6 +545,7 @@ function App() {
       await loadAuditLogs();
       await loadCompanyProfile();
       await loadReviewQueue();
+      await loadScanHistory();
       await checkAiStatus();
     })();
 
@@ -548,7 +560,7 @@ function App() {
       clearInterval(interval);
       clearInterval(aiInterval);
     };
-  }, [loadData, loadReports, checkAiStatus, loadAuditLogs, loadCompanies, loadCompanyProfile, loadReviewQueue]);
+  }, [loadData, loadReports, checkAiStatus, loadAuditLogs, loadCompanies, loadCompanyProfile, loadReviewQueue, loadScanHistory]);
 
 
   const updateReviewStatus = async (id, type, status) => {
@@ -697,6 +709,7 @@ function App() {
     } finally {
       setCompanyScanning(false);
       loadData();
+      loadScanHistory();
     }
   };
 
@@ -705,6 +718,7 @@ function App() {
       await fetch(`${API_BASE}/scan-company-impact/stop`, { method: 'POST' });
       setCompanyScanning(false);
       loadData();
+      loadScanHistory();
     } catch (err) {
       console.error(err);
     }
@@ -892,6 +906,7 @@ function App() {
               reviewQueue={reviewQueue}
               companyScanning={companyScanning}
               scanProgress={scanProgress}
+              scanHistory={scanHistory}
             />
           )}
 

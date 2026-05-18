@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { 
   Settings, RefreshCw, Zap, Shield, Database, Activity, FileText, 
-  ArrowRight, Search, UserCheck, Bell, Filter, ShieldAlert, Cpu, Server, Network
+  ArrowRight, Search, UserCheck, Bell, Filter, ShieldAlert, Cpu, Server, Network, GitBranch
 } from 'lucide-react';
 
 const CompanyRadar = ({
   incidents, cves = [], companyProfile, setSelectedRawIncident, setView,
-  handleCompanyScan, handleStopScan, reviewQueue, companyScanning, scanProgress
+  handleCompanyScan, handleStopScan, reviewQueue, companyScanning, scanProgress,
+  scanHistory = []
 }) => {
-  const [engineView, setEngineView] = useState('heuristic'); // 'heuristic' | 'version'
 
   // Combine Incidents and CVEs into a unified threat pool
   const unifiedThreats = [
@@ -16,12 +16,15 @@ const CompanyRadar = ({
     ...cves.map(c => ({ ...c, source_type: 'cve' }))
   ];
 
-  // Filter based on detection method and sort by impact score
-  const heuristicThreats = unifiedThreats.filter(t => t.detection_method === 'Heuristic').sort((a, b) => (b.company_impact_score || 0) - (a.company_impact_score || 0));
-  const versionThreats = unifiedThreats.filter(t => t.detection_method && t.detection_method.includes('Version')).sort((a, b) => (b.company_impact_score || 0) - (a.company_impact_score || 0));
+  // All threats detected by the unified heuristic engine
+  const detectedThreats = unifiedThreats
+    .filter(t => t.company_impact_status === 'Yes')
+    .sort((a, b) => (b.company_impact_score || 0) - (a.company_impact_score || 0));
 
-  // Active dataset based on view
-  const activeThreats = engineView === 'heuristic' ? heuristicThreats : versionThreats;
+  // Stats
+  const versionMatches = detectedThreats.filter(t => t.detection_method && t.detection_method.includes('Version'));
+  const industryMatches = detectedThreats.filter(t => t.detection_method && t.detection_method.includes('Industry'));
+  const productMatches = detectedThreats.filter(t => !t.detection_method || t.detection_method === 'Heuristic');
 
   // Reusable Step Component for Flowchart
   const FlowStep = ({ icon, label, sub, color, pulse, delay }) => (
@@ -80,25 +83,25 @@ const CompanyRadar = ({
       {/* Header & Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
-          <h2 style={{ fontSize: '28px', fontWeight: 900, background: 'linear-gradient(90deg, #fff, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            Dual-Engine Impact Radar v4.0
+          <h2 style={{ fontSize: '28px', fontWeight: 900, background: 'linear-gradient(90deg, #fff, #10b981)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            Heuristic Impact Radar v5.0
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '8px', maxWidth: '600px' }}>
-            Deterministic threat processing pipeline. Select an engine to view its specific processing flow and the exact threats it isolated against your inventory.
+            Unified version-aware deterministic engine. Exact string match + semantic version range, wildcard, and operator comparison in a single pass.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn-ghost" onClick={() => setView('inventory')}><Settings size={14} /> Adjust Stack</button>
           <button 
             className="btn-ghost" 
-            onClick={() => handleCompanyScan(false, engineView)}
+            onClick={() => handleCompanyScan(false, 'all')}
             style={{ border: '1px solid #10b981', color: '#10b981', padding: '10px 16px', fontSize: '12px' }}
           >
             <RefreshCw size={14} style={{ marginRight: '6px' }} /> New Threat Scan
           </button>
           <button 
             className="btn-ghost" 
-            onClick={() => handleCompanyScan(true, engineView)}
+            onClick={() => handleCompanyScan(true, 'all')}
             style={{ border: '1px solid #ef4444', color: '#ef4444', padding: '10px 16px', fontSize: '12px' }}
           >
             <RefreshCw size={14} style={{ marginRight: '6px' }} /> Full Scan
@@ -108,14 +111,14 @@ const CompanyRadar = ({
 
       {/* Real-time Scan Progress */}
       {companyScanning && (
-        <div className="glass-card fade-in" style={{ padding: '24px', marginBottom: '32px', border: '1px solid var(--primary)', background: 'rgba(99, 102, 241, 0.05)' }}>
+        <div className="glass-card fade-in" style={{ padding: '24px', marginBottom: '32px', border: '1px solid #10b981', background: 'rgba(16, 185, 129, 0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 900, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <RefreshCw size={18} className="animate-spin" color={scanProgress.activeEngine === 'heuristic' ? '#10b981' : '#f59e0b'} />
-              {scanProgress.activeEngine === 'heuristic' ? 'Heuristic Engine Active...' : 'Version Extractor Active...'}
+              <RefreshCw size={18} className="animate-spin" color="#10b981" />
+              Heuristic Engine (Version-Aware) Scanning...
             </h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--primary)' }}>
+              <div style={{ fontSize: '14px', fontWeight: 800, color: '#10b981' }}>
                 {scanProgress.percentage}%
               </div>
               <button 
@@ -128,7 +131,7 @@ const CompanyRadar = ({
           </div>
           
           <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', marginBottom: '20px' }}>
-            <div style={{ width: `${scanProgress.percentage}%`, height: '100%', background: 'linear-gradient(90deg, #6366f1, #a855f7)', transition: 'width 0.5s ease' }}></div>
+            <div style={{ width: `${scanProgress.percentage}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #34d399)', transition: 'width 0.5s ease' }}></div>
           </div>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
@@ -152,106 +155,57 @@ const CompanyRadar = ({
         </div>
       )}
 
-      {/* Engine Toggle Buttons */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '40px' }}>
-        <button 
-          onClick={() => setEngineView('heuristic')}
-          style={{
-            flex: 1,
-            padding: '24px',
-            borderRadius: '16px',
-            border: `2px solid ${engineView === 'heuristic' ? '#10b981' : 'var(--border)'}`,
-            background: engineView === 'heuristic' ? 'rgba(16, 185, 129, 0.05)' : 'rgba(255,255,255,0.02)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            boxShadow: engineView === 'heuristic' ? '0 0 30px rgba(16, 185, 129, 0.1)' : 'none'
-          }}
-        >
-          <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '12px', borderRadius: '12px', marginBottom: '12px', color: '#10b981' }}>
-            <Database size={28} />
-          </div>
-          <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '1px' }}>HEURISTIC ENGINE</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>Deterministic Exact-Match Scanning</div>
-          <div style={{ marginTop: '16px', fontSize: '10px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '4px 12px', borderRadius: '20px', fontWeight: 800 }}>
-            {heuristicThreats.length} THREATS ISOLATED
-          </div>
-        </button>
-
-        <button 
-          onClick={() => setEngineView('version')}
-          style={{
-            flex: 1,
-            padding: '24px',
-            borderRadius: '16px',
-            border: `2px solid ${engineView === 'version' ? '#f59e0b' : 'var(--border)'}`,
-            background: engineView === 'version' ? 'rgba(245, 158, 11, 0.05)' : 'rgba(255,255,255,0.02)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            boxShadow: engineView === 'version' ? '0 0 30px rgba(245, 158, 11, 0.1)' : 'none'
-          }}
-        >
-          <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '12px', borderRadius: '12px', marginBottom: '12px', color: '#f59e0b' }}>
-            <Cpu size={28} />
-          </div>
-          <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '1px' }}>VERSION EXTRACTOR</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>Semantic Version Range & Wildcard Matching</div>
-          <div style={{ marginTop: '16px', fontSize: '10px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '4px 12px', borderRadius: '20px', fontWeight: 800 }}>
-            {versionThreats.length} THREATS ISOLATED
-          </div>
-        </button>
+      {/* Engine Stats Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+        <div className="glass-card" style={{ padding: '20px', textAlign: 'center', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+          <div style={{ fontSize: '28px', fontWeight: 900, color: '#10b981' }}>{detectedThreats.length}</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 800, marginTop: '6px', textTransform: 'uppercase' }}>Total Detected</div>
+        </div>
+        <div className="glass-card" style={{ padding: '20px', textAlign: 'center', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+          <div style={{ fontSize: '28px', fontWeight: 900, color: '#f59e0b' }}>{versionMatches.length}</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 800, marginTop: '6px', textTransform: 'uppercase' }}>Version Matches</div>
+        </div>
+        <div className="glass-card" style={{ padding: '20px', textAlign: 'center', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+          <div style={{ fontSize: '28px', fontWeight: 900, color: '#818cf8' }}>{industryMatches.length}</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 800, marginTop: '6px', textTransform: 'uppercase' }}>Industry Matches</div>
+        </div>
+        <div className="glass-card" style={{ padding: '20px', textAlign: 'center', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+          <div style={{ fontSize: '28px', fontWeight: 900, color: '#60a5fa' }}>{productMatches.length}</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 800, marginTop: '6px', textTransform: 'uppercase' }}>Product Matches</div>
+        </div>
       </div>
 
       {/* Pipeline Flowchart Visualization */}
       <div className="glass-card fade-in" style={{ padding: '40px', marginBottom: '32px', position: 'relative', overflow: 'hidden' }}>
         <h3 style={{ fontSize: '12px', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '40px', textAlign: 'center' }}>
-          {engineView === 'heuristic' ? 'Deterministic Processing Pipeline' : 'Version Extraction Pipeline'}
+          Unified Version-Aware Heuristic Pipeline
         </h3>
         
-        {engineView === 'heuristic' ? (
-          /* HEURISTIC FLOWCHART */
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '900px', margin: '0 auto' }}>
-            <FlowStep icon={<Zap size={24} />} label="Threat Arrives" sub="CVE / RSS Data" color="#f59e0b" pulse delay="0s" />
-            <FlowArrow />
-            <FlowStep icon={<Filter size={24} />} label="Header Filter" sub="Tech Stack Match" color="#10b981" pulse delay="0.5s" />
-            <FlowArrow />
-            <FlowStep icon={<Database size={24} />} label="Exact Match" sub="Saved Inventory" color="#10b981" pulse delay="1s" />
-            <FlowArrow />
-            <FlowStep icon={<ShieldAlert size={24} />} label="Review Queue" sub="Analyst Action" color="#ef4444" pulse delay="1.5s" />
-          </div>
-        ) : (
-          /* VERSION EXTRACTOR FLOWCHART */
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1000px', margin: '0 auto' }}>
-            <FlowStep icon={<Zap size={22} />} label="Threat Arrives" sub="CVE / RSS Data" color="#f59e0b" />
-            <FlowArrow />
-            <FlowStep icon={<Search size={22} />} label="Version Extract" sub="Regex Parsing" color="#f59e0b" pulse delay="0s" />
-            <FlowArrow />
-            <FlowStep icon={<Database size={22} />} label="Range Compare" sub="Semantic Match" color="#f59e0b" pulse delay="0.3s" />
-            <FlowArrow />
-            <FlowStep icon={<Activity size={22} />} label="Overlap Score" sub="Confidence %" color="#f59e0b" pulse delay="0.6s" />
-            <FlowArrow />
-            <FlowStep icon={<ShieldAlert size={22} />} label="Review Queue" sub="Analyst Action" color="#ef4444" pulse delay="0.9s" />
-          </div>
-        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1000px', margin: '0 auto' }}>
+          <FlowStep icon={<Zap size={22} />} label="Threat Arrives" sub="CVE / RSS Data" color="#f59e0b" pulse delay="0s" />
+          <FlowArrow />
+          <FlowStep icon={<Search size={22} />} label="Product Match" sub="Name + Aliases" color="#10b981" pulse delay="0.3s" />
+          <FlowArrow />
+          <FlowStep icon={<GitBranch size={22} />} label="Version Extract" sub="Range / Wildcard" color="#10b981" pulse delay="0.6s" />
+          <FlowArrow />
+          <FlowStep icon={<Database size={22} />} label="Overlap Check" sub="Semantic Compare" color="#10b981" pulse delay="0.9s" />
+          <FlowArrow />
+          <FlowStep icon={<ShieldAlert size={22} />} label="Review Queue" sub="Analyst Action" color="#ef4444" pulse delay="1.2s" />
+        </div>
       </div>
 
       {/* Main Content Area Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '24px' }}>
         
-        {/* Engine-Specific Threat List */}
+        {/* Detected Threats List */}
         <div className="glass-card fade-in" style={{ padding: '24px', minHeight: '400px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 800, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-             {engineView === 'heuristic' ? <Database size={18} color="#10b981" /> : <Cpu size={18} color="#f59e0b" />}
-             Threats Caught by {engineView === 'heuristic' ? 'Heuristic Match' : 'Version Extractor'}
+             <Database size={18} color="#10b981" />
+             Threats Detected by Heuristic Engine ({detectedThreats.length})
           </h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {activeThreats.length > 0 ? activeThreats.map(inc => (
+            {detectedThreats.length > 0 ? detectedThreats.map(inc => (
               <div 
                 key={`${inc.source_type}-${inc.id || inc.cve_id}`} 
                 className="hover-card"
@@ -283,6 +237,29 @@ const CompanyRadar = ({
                     ) : (
                       <span style={{ fontSize: '8px', fontWeight: 900, background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>INCIDENT</span>
                     )}
+                    {inc.detection_method && (
+                      <span style={{ 
+                        fontSize: '8px', fontWeight: 900, 
+                        background: inc.detection_method.includes('Version') ? 'rgba(245, 158, 11, 0.1)' : inc.detection_method.includes('Industry') ? 'rgba(99, 102, 241, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
+                        color: inc.detection_method.includes('Version') ? '#f59e0b' : inc.detection_method.includes('Industry') ? '#818cf8' : '#10b981', 
+                        padding: '2px 6px', borderRadius: '4px', 
+                        border: `1px solid ${inc.detection_method.includes('Version') ? 'rgba(245, 158, 11, 0.2)' : inc.detection_method.includes('Industry') ? 'rgba(99, 102, 241, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
+                        textTransform: 'uppercase'
+                      }}>
+                        {inc.detection_method}
+                      </span>
+                    )}
+                    {inc.scan_iteration > 0 && (
+                      <span style={{ 
+                        fontSize: '8px', fontWeight: 900, 
+                        background: 'rgba(0, 163, 255, 0.1)', 
+                        color: '#00a3ff', 
+                        padding: '2px 6px', borderRadius: '4px', 
+                        border: '1px solid rgba(0, 163, 255, 0.2)'
+                      }}>
+                        ITERATION #{inc.scan_iteration}
+                      </span>
+                    )}
                     <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-main)' }}>
                       {inc.cve_id ? inc.cve_id : inc.title}
                     </div>
@@ -310,7 +287,7 @@ const CompanyRadar = ({
               <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
                  <Shield size={40} style={{ opacity: 0.2, margin: '0 auto 16px' }} />
                  <div style={{ fontSize: '14px', fontWeight: 800 }}>Clear Skies</div>
-                 <div style={{ fontSize: '12px', marginTop: '8px' }}>This engine has not detected any matching threats currently.</div>
+                 <div style={{ fontSize: '12px', marginTop: '8px' }}>No threats detected against your inventory. Run a scan to analyze new threats.</div>
               </div>
             )}
           </div>
@@ -352,18 +329,20 @@ const CompanyRadar = ({
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {companyProfile.tech_stack.map((tech, idx) => {
                 const name = typeof tech === 'string' ? tech : tech.name;
-                const version = typeof tech === 'object' && tech.version ? ` (v${tech.version})` : '';
+                const version = typeof tech === 'object' && tech.version ? ` v${tech.version}` : '';
+                const hasVersion = typeof tech === 'object' && tech.version;
                 return (
                   <span key={idx} style={{ 
                     fontSize: '11px', 
                     fontWeight: 600,
-                    background: 'rgba(59, 130, 246, 0.1)', 
-                    color: '#60a5fa',
+                    background: hasVersion ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)', 
+                    color: hasVersion ? '#10b981' : '#f59e0b',
                     padding: '4px 10px', 
                     borderRadius: '6px', 
-                    border: '1px solid rgba(59, 130, 246, 0.2)' 
+                    border: `1px solid ${hasVersion ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)'}` 
                   }}>
                     {name}{version}
+                    {!hasVersion && <span style={{ fontSize: '9px', marginLeft: '4px', opacity: 0.7 }}>⚠ no ver</span>}
                   </span>
                 );
               })}
@@ -380,6 +359,58 @@ const CompanyRadar = ({
             >
               Manage Inventory
             </button>
+          </div>
+
+          {/* Scan History and Rolling Window explanation */}
+          <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(0, 163, 255, 0.2)' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Activity size={16} color="#00a3ff" /> Scan Iteration History
+            </h3>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '16px' }}>
+              The system keeps a <strong>rolling window of the last 2 completed full scans</strong>.
+              When iteration #3 starts, iteration #1 is safely purged to ensure only relevant threat context is retained.
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {scanHistory && scanHistory.length > 0 ? (
+                scanHistory.map((s, idx) => (
+                  <div key={s.id || idx} style={{ 
+                    padding: '10px 12px', 
+                    background: 'rgba(255,255,255,0.01)', 
+                    borderRadius: '8px', 
+                    border: `1px solid ${idx === 0 ? 'rgba(16, 185, 129, 0.2)' : 'var(--border)'}`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 800, color: idx === 0 ? '#10b981' : 'var(--text-main)' }}>
+                        Iteration #{s.iteration} {idx === 0 && '(Latest)'}
+                      </span>
+                      <span style={{ 
+                        fontSize: '9px', 
+                        padding: '2px 6px', 
+                        borderRadius: '4px',
+                        background: s.status === 'completed' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                        color: s.status === 'completed' ? '#10b981' : '#f59e0b',
+                        fontWeight: 800,
+                        textTransform: 'uppercase'
+                      }}>
+                        {s.status}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Threats Flagged: <strong>{s.threats_found}</strong></span>
+                      <span>Scanned: {s.incidents_scanned + s.cves_scanned}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: '16px', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', border: '1px dashed var(--border)' }}>
+                  No scan iteration records found.
+                </div>
+              )}
+            </div>
           </div>
 
         </div>

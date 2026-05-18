@@ -27,7 +27,8 @@ class Incident(Base):
     company_impact_score = Column(Integer, default=0) # 0-100 for Radar proximity
     review_status = Column(String, default="Pending") # 'Pending', 'Reviewed', 'Dismissed'
     impact_flag = Column(Integer, default=0) # 1 if high impact, 0 otherwise
-    detection_method = Column(String, nullable=True) # Heuristic or AI Map
+    detection_method = Column(String, nullable=True) # Heuristic (Version-Aware), Heuristic (Industry-Match)
+    scan_iteration = Column(Integer, default=0) # Track which scan iteration detected this
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     raw_data = Column(JSON, nullable=True) # Full payload from source
     full_analysis = Column(String, nullable=True) # 500+ word AI analysis
@@ -90,7 +91,8 @@ class CVE(Base):
     company_impact_reason = Column(String, nullable=True)
     review_status = Column(String, default="Pending") # 'Pending', 'Reviewed', 'Dismissed'
     impact_flag = Column(Integer, default=0) # 1 if high impact, 0 otherwise
-    detection_method = Column(String, nullable=True) # Heuristic or AI Map
+    detection_method = Column(String, nullable=True) # Heuristic (Version-Aware), Heuristic (Industry-Match)
+    scan_iteration = Column(Integer, default=0) # Track which scan iteration detected this
     
     # AI Enriched Fields
     company_name = Column(String, index=True, nullable=True)
@@ -133,7 +135,21 @@ class CompanyProfile(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     company_name = Column(String, default="My Company")
-    tech_stack = Column(JSON, default=[]) # ["Vercel", "Chrome", "Microsoft"]
+    tech_stack = Column(JSON, default=[]) # [{"name": "Java", "version": "11.0.15"}]
     industry = Column(String, default="Finance")
     last_updated = Column(DateTime, default=datetime.datetime.utcnow)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class ScanHistory(Base):
+    __tablename__ = "scan_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    iteration = Column(Integer, index=True)
+    scan_type = Column(String) # 'full' or 'new'
+    incidents_scanned = Column(Integer, default=0)
+    cves_scanned = Column(Integer, default=0)
+    threats_found = Column(Integer, default=0)
+    threats_no_impact = Column(Integer, default=0)
+    started_at = Column(DateTime, default=datetime.datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    status = Column(String, default="running") # 'running', 'completed', 'canceled'

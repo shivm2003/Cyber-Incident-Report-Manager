@@ -3,19 +3,8 @@ import { Shield, Check } from 'lucide-react';
 
 const ManualReviewQueueUI = ({ queue, onUpdateStatus, onSelectItem }) => {
   const [activeTab, setActiveTab] = useState('incidents'); // 'incidents' or 'cves'
-  const [engineFilter, setEngineFilter] = useState('all'); // 'all', 'Heuristic', 'Version'
 
-  const filterByEngine = (list) => {
-    if (engineFilter === 'all') return list;
-    if (engineFilter === 'Version') return list.filter(item => item.detection_method && item.detection_method.includes('Version'));
-    return list.filter(item => item.detection_method === engineFilter);
-  };
-
-  const filteredIncidents = filterByEngine(queue.incidents);
-  const filteredCves = filterByEngine(queue.cves);
-
-  const baseItems = activeTab === 'incidents' ? queue.incidents : queue.cves;
-  const items = filterByEngine(baseItems);
+  const items = activeTab === 'incidents' ? queue.incidents : queue.cves;
 
   return (
     <div className="review-queue-container fade-in">
@@ -25,66 +14,14 @@ const ManualReviewQueueUI = ({ queue, onUpdateStatus, onSelectItem }) => {
           onClick={() => setActiveTab('incidents')}
           style={{ flex: 1, margin: 0, justifyContent: 'center' }}
         >
-          Intelligence Incidents ({filteredIncidents.length})
+          Intelligence Incidents ({queue.incidents.length})
         </button>
         <button 
           className={`nav-item ${activeTab === 'cves' ? 'active' : ''}`} 
           onClick={() => setActiveTab('cves')}
           style={{ flex: 1, margin: 0, justifyContent: 'center' }}
         >
-          NVD Vulnerabilities ({filteredCves.length})
-        </button>
-      </div>
-
-      {/* Engine Filter Toggle */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', justifyContent: 'center' }}>
-        <button 
-          onClick={() => setEngineFilter('all')}
-          style={{ 
-            padding: '8px 24px', 
-            borderRadius: '20px', 
-            fontSize: '12px', 
-            fontWeight: 800,
-            background: engineFilter === 'all' ? 'rgba(255,255,255,0.1)' : 'transparent',
-            border: `1px solid ${engineFilter === 'all' ? 'var(--text-main)' : 'var(--border)'}`,
-            color: engineFilter === 'all' ? 'var(--text-main)' : 'var(--text-muted)',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-        >
-          All Engines
-        </button>
-        <button 
-          onClick={() => setEngineFilter('Heuristic')}
-          style={{ 
-            padding: '8px 24px', 
-            borderRadius: '20px', 
-            fontSize: '12px', 
-            fontWeight: 800,
-            background: engineFilter === 'Heuristic' ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
-            border: `1px solid ${engineFilter === 'Heuristic' ? '#10b981' : 'var(--border)'}`,
-            color: engineFilter === 'Heuristic' ? '#10b981' : 'var(--text-muted)',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-        >
-          Heuristic Match
-        </button>
-        <button 
-          onClick={() => setEngineFilter('Version')}
-          style={{ 
-            padding: '8px 24px', 
-            borderRadius: '20px', 
-            fontSize: '12px', 
-            fontWeight: 800,
-            background: engineFilter === 'Version' ? 'rgba(245, 158, 11, 0.1)' : 'transparent',
-            border: `1px solid ${engineFilter === 'Version' ? '#f59e0b' : 'var(--border)'}`,
-            color: engineFilter === 'Version' ? '#f59e0b' : 'var(--text-muted)',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-        >
-          Version Extractor
+          NVD Vulnerabilities ({queue.cves.length})
         </button>
       </div>
 
@@ -128,14 +65,14 @@ const ManualReviewQueueUI = ({ queue, onUpdateStatus, onSelectItem }) => {
                     
                     {item.detection_method && (
                       <span style={{ 
-                        background: item.detection_method === 'Heuristic' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)', 
-                        color: item.detection_method === 'Heuristic' ? '#10b981' : '#f59e0b', 
+                        background: item.detection_method.includes('Version') ? 'rgba(245, 158, 11, 0.1)' : item.detection_method.includes('Industry') ? 'rgba(99, 102, 241, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
+                        color: item.detection_method.includes('Version') ? '#f59e0b' : item.detection_method.includes('Industry') ? '#818cf8' : '#10b981', 
                         padding: '4px 8px', 
                         borderRadius: '6px', 
                         fontSize: '9px', 
                         fontWeight: 900,
                         textTransform: 'uppercase',
-                        border: `1px solid ${item.detection_method === 'Heuristic' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`
+                        border: `1px solid ${item.detection_method.includes('Version') ? 'rgba(245, 158, 11, 0.2)' : item.detection_method.includes('Industry') ? 'rgba(99, 102, 241, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`
                       }}>
                         {item.detection_method}
                       </span>

@@ -22,6 +22,7 @@ class IncidentBase(BaseModel):
     review_status: str | None = "Pending"
     impact_flag: int | None = 0
     detection_method: str | None = None
+    scan_iteration: int | None = 0
     raw_data: dict | list | None = None
     full_analysis: str | None = None
     crawled_content: str | None = None
@@ -94,6 +95,7 @@ class CVEResponse(CVEBase):
     review_status: str | None = "Pending"
     impact_flag: int | None = 0
     detection_method: str | None = None
+    scan_iteration: int | None = 0
 
     class Config:
         from_attributes = True
