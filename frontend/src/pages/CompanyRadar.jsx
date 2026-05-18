@@ -8,7 +8,7 @@ const CompanyRadar = ({
   incidents, cves = [], companyProfile, setSelectedRawIncident, setView,
   handleCompanyScan, handleStopScan, reviewQueue, companyScanning, scanProgress
 }) => {
-  const [engineView, setEngineView] = useState('heuristic'); // 'heuristic' | 'ai'
+  const [engineView, setEngineView] = useState('heuristic'); // 'heuristic' | 'version'
 
   // Combine Incidents and CVEs into a unified threat pool
   const unifiedThreats = [
@@ -18,10 +18,10 @@ const CompanyRadar = ({
 
   // Filter based on detection method and sort by impact score
   const heuristicThreats = unifiedThreats.filter(t => t.detection_method === 'Heuristic').sort((a, b) => (b.company_impact_score || 0) - (a.company_impact_score || 0));
-  const aiThreats = unifiedThreats.filter(t => t.detection_method === 'AI Map').sort((a, b) => (b.company_impact_score || 0) - (a.company_impact_score || 0));
+  const versionThreats = unifiedThreats.filter(t => t.detection_method && t.detection_method.includes('Version')).sort((a, b) => (b.company_impact_score || 0) - (a.company_impact_score || 0));
 
   // Active dataset based on view
-  const activeThreats = engineView === 'heuristic' ? heuristicThreats : aiThreats;
+  const activeThreats = engineView === 'heuristic' ? heuristicThreats : versionThreats;
 
   // Reusable Step Component for Flowchart
   const FlowStep = ({ icon, label, sub, color, pulse, delay }) => (
@@ -81,10 +81,10 @@ const CompanyRadar = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <h2 style={{ fontSize: '28px', fontWeight: 900, background: 'linear-gradient(90deg, #fff, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            Dual-Engine Impact Radar
+            Dual-Engine Impact Radar v4.0
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '8px', maxWidth: '600px' }}>
-            Autonomous threat processing pipeline. Select an engine to view its specific processing flow and the exact threats it isolated against your inventory.
+            Deterministic threat processing pipeline. Select an engine to view its specific processing flow and the exact threats it isolated against your inventory.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -111,8 +111,8 @@ const CompanyRadar = ({
         <div className="glass-card fade-in" style={{ padding: '24px', marginBottom: '32px', border: '1px solid var(--primary)', background: 'rgba(99, 102, 241, 0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 900, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <RefreshCw size={18} className="animate-spin" color={scanProgress.activeEngine === 'heuristic' ? '#10b981' : '#818cf8'} />
-              {scanProgress.activeEngine === 'heuristic' ? 'Heuristic Engine Active...' : 'AI Engine (Gemma) Active...'}
+              <RefreshCw size={18} className="animate-spin" color={scanProgress.activeEngine === 'heuristic' ? '#10b981' : '#f59e0b'} />
+              {scanProgress.activeEngine === 'heuristic' ? 'Heuristic Engine Active...' : 'Version Extractor Active...'}
             </h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--primary)' }}>
@@ -181,28 +181,28 @@ const CompanyRadar = ({
         </button>
 
         <button 
-          onClick={() => setEngineView('ai')}
+          onClick={() => setEngineView('version')}
           style={{
             flex: 1,
             padding: '24px',
             borderRadius: '16px',
-            border: `2px solid ${engineView === 'ai' ? '#818cf8' : 'var(--border)'}`,
-            background: engineView === 'ai' ? 'rgba(99, 102, 241, 0.05)' : 'rgba(255,255,255,0.02)',
+            border: `2px solid ${engineView === 'version' ? '#f59e0b' : 'var(--border)'}`,
+            background: engineView === 'version' ? 'rgba(245, 158, 11, 0.05)' : 'rgba(255,255,255,0.02)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             cursor: 'pointer',
             transition: 'all 0.3s ease',
-            boxShadow: engineView === 'ai' ? '0 0 30px rgba(99, 102, 241, 0.1)' : 'none'
+            boxShadow: engineView === 'version' ? '0 0 30px rgba(245, 158, 11, 0.1)' : 'none'
           }}
         >
-          <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '12px', borderRadius: '12px', marginBottom: '12px', color: '#818cf8' }}>
+          <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '12px', borderRadius: '12px', marginBottom: '12px', color: '#f59e0b' }}>
             <Cpu size={28} />
           </div>
-          <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '1px' }}>AI ENGINE (GEMMA)</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>Probabilistic Contextual Risk Scoring</div>
-          <div style={{ marginTop: '16px', fontSize: '10px', background: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', padding: '4px 12px', borderRadius: '20px', fontWeight: 800 }}>
-            {aiThreats.length} THREATS ISOLATED
+          <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '1px' }}>VERSION EXTRACTOR</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>Semantic Version Range & Wildcard Matching</div>
+          <div style={{ marginTop: '16px', fontSize: '10px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '4px 12px', borderRadius: '20px', fontWeight: 800 }}>
+            {versionThreats.length} THREATS ISOLATED
           </div>
         </button>
       </div>
@@ -210,7 +210,7 @@ const CompanyRadar = ({
       {/* Pipeline Flowchart Visualization */}
       <div className="glass-card fade-in" style={{ padding: '40px', marginBottom: '32px', position: 'relative', overflow: 'hidden' }}>
         <h3 style={{ fontSize: '12px', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '40px', textAlign: 'center' }}>
-          {engineView === 'heuristic' ? 'Deterministic Processing Pipeline' : 'Contextual Intelligence Pipeline'}
+          {engineView === 'heuristic' ? 'Deterministic Processing Pipeline' : 'Version Extraction Pipeline'}
         </h3>
         
         {engineView === 'heuristic' ? (
@@ -225,21 +225,17 @@ const CompanyRadar = ({
             <FlowStep icon={<ShieldAlert size={24} />} label="Review Queue" sub="Analyst Action" color="#ef4444" pulse delay="1.5s" />
           </div>
         ) : (
-          /* AI FLOWCHART */
+          /* VERSION EXTRACTOR FLOWCHART */
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1000px', margin: '0 auto' }}>
-            <FlowStep icon={<Zap size={22} />} label="Threat Arrives" sub="Raw Intelligence" color="#f59e0b" />
+            <FlowStep icon={<Zap size={22} />} label="Threat Arrives" sub="CVE / RSS Data" color="#f59e0b" />
             <FlowArrow />
-            <FlowStep icon={<Network size={22} />} label="Pass Headers" sub="Full Context" color="#818cf8" pulse delay="0s" />
+            <FlowStep icon={<Search size={22} />} label="Version Extract" sub="Regex Parsing" color="#f59e0b" pulse delay="0s" />
             <FlowArrow />
-            <FlowStep icon={<Search size={22} />} label="Fuzzy Match" sub="Deep Inventory" color="#a855f7" pulse delay="0.3s" />
+            <FlowStep icon={<Database size={22} />} label="Range Compare" sub="Semantic Match" color="#f59e0b" pulse delay="0.3s" />
             <FlowArrow />
-            <FlowStep icon={<Activity size={22} />} label="Risk Score" sub="Gemma Analysis" color="#ec4899" pulse delay="0.6s" />
+            <FlowStep icon={<Activity size={22} />} label="Overlap Score" sub="Confidence %" color="#f59e0b" pulse delay="0.6s" />
             <FlowArrow />
-            <FlowStep icon={<ShieldAlert size={22} />} label="Review Queue" sub="Pending Action" color="#ef4444" pulse delay="0.9s" />
-            <FlowArrow />
-            <FlowStep icon={<UserCheck size={22} />} label="Validation" sub="Analyst Sign-off" color="#10b981" />
-            <FlowArrow />
-            <FlowStep icon={<Bell size={22} />} label="Alert & Report" sub="CISO Dispatch" color="#3b82f6" />
+            <FlowStep icon={<ShieldAlert size={22} />} label="Review Queue" sub="Analyst Action" color="#ef4444" pulse delay="0.9s" />
           </div>
         )}
       </div>
@@ -250,8 +246,8 @@ const CompanyRadar = ({
         {/* Engine-Specific Threat List */}
         <div className="glass-card fade-in" style={{ padding: '24px', minHeight: '400px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 800, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-             {engineView === 'heuristic' ? <Database size={18} color="#10b981" /> : <Cpu size={18} color="#818cf8" />}
-             Threats Caught by {engineView === 'heuristic' ? 'Heuristic Match' : 'AI Analysis'}
+             {engineView === 'heuristic' ? <Database size={18} color="#10b981" /> : <Cpu size={18} color="#f59e0b" />}
+             Threats Caught by {engineView === 'heuristic' ? 'Heuristic Match' : 'Version Extractor'}
           </h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

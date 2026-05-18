@@ -3,13 +3,19 @@ import { Shield, Check } from 'lucide-react';
 
 const ManualReviewQueueUI = ({ queue, onUpdateStatus, onSelectItem }) => {
   const [activeTab, setActiveTab] = useState('incidents'); // 'incidents' or 'cves'
-  const [engineFilter, setEngineFilter] = useState('all'); // 'all', 'Heuristic', 'AI Map'
+  const [engineFilter, setEngineFilter] = useState('all'); // 'all', 'Heuristic', 'Version'
+
+  const filterByEngine = (list) => {
+    if (engineFilter === 'all') return list;
+    if (engineFilter === 'Version') return list.filter(item => item.detection_method && item.detection_method.includes('Version'));
+    return list.filter(item => item.detection_method === engineFilter);
+  };
+
+  const filteredIncidents = filterByEngine(queue.incidents);
+  const filteredCves = filterByEngine(queue.cves);
 
   const baseItems = activeTab === 'incidents' ? queue.incidents : queue.cves;
-  const items = baseItems.filter(item => {
-    if (engineFilter === 'all') return true;
-    return item.detection_method === engineFilter;
-  });
+  const items = filterByEngine(baseItems);
 
   return (
     <div className="review-queue-container fade-in">
@@ -19,14 +25,14 @@ const ManualReviewQueueUI = ({ queue, onUpdateStatus, onSelectItem }) => {
           onClick={() => setActiveTab('incidents')}
           style={{ flex: 1, margin: 0, justifyContent: 'center' }}
         >
-          Intelligence Incidents ({queue.incidents.length})
+          Intelligence Incidents ({filteredIncidents.length})
         </button>
         <button 
           className={`nav-item ${activeTab === 'cves' ? 'active' : ''}`} 
           onClick={() => setActiveTab('cves')}
           style={{ flex: 1, margin: 0, justifyContent: 'center' }}
         >
-          NVD Vulnerabilities ({queue.cves.length})
+          NVD Vulnerabilities ({filteredCves.length})
         </button>
       </div>
 
@@ -65,20 +71,20 @@ const ManualReviewQueueUI = ({ queue, onUpdateStatus, onSelectItem }) => {
           Heuristic Match
         </button>
         <button 
-          onClick={() => setEngineFilter('AI Map')}
+          onClick={() => setEngineFilter('Version')}
           style={{ 
             padding: '8px 24px', 
             borderRadius: '20px', 
             fontSize: '12px', 
             fontWeight: 800,
-            background: engineFilter === 'AI Map' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-            border: `1px solid ${engineFilter === 'AI Map' ? '#818cf8' : 'var(--border)'}`,
-            color: engineFilter === 'AI Map' ? '#818cf8' : 'var(--text-muted)',
+            background: engineFilter === 'Version' ? 'rgba(245, 158, 11, 0.1)' : 'transparent',
+            border: `1px solid ${engineFilter === 'Version' ? '#f59e0b' : 'var(--border)'}`,
+            color: engineFilter === 'Version' ? '#f59e0b' : 'var(--text-muted)',
             cursor: 'pointer',
             transition: 'all 0.2s'
           }}
         >
-          AI Engine (Gemma)
+          Version Extractor
         </button>
       </div>
 
@@ -122,14 +128,14 @@ const ManualReviewQueueUI = ({ queue, onUpdateStatus, onSelectItem }) => {
                     
                     {item.detection_method && (
                       <span style={{ 
-                        background: item.detection_method === 'Heuristic' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(99, 102, 241, 0.1)', 
-                        color: item.detection_method === 'Heuristic' ? '#10b981' : '#818cf8', 
+                        background: item.detection_method === 'Heuristic' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)', 
+                        color: item.detection_method === 'Heuristic' ? '#10b981' : '#f59e0b', 
                         padding: '4px 8px', 
                         borderRadius: '6px', 
                         fontSize: '9px', 
                         fontWeight: 900,
                         textTransform: 'uppercase',
-                        border: `1px solid ${item.detection_method === 'Heuristic' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)'}`
+                        border: `1px solid ${item.detection_method === 'Heuristic' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`
                       }}>
                         {item.detection_method}
                       </span>

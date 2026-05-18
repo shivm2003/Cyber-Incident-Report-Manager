@@ -227,7 +227,7 @@ const Dashboard = ({
               <th>Incident Date</th>
               <th>Collected At</th>
               <th style={{ textAlign: 'center' }}>Heuristic Scan</th>
-              <th style={{ textAlign: 'center' }}>Gemma Scan</th>
+              <th style={{ textAlign: 'center' }}>Version Scan</th>
               <th style={{ textAlign: 'center' }}>Actions</th>
             </tr>
           </thead>
@@ -338,8 +338,8 @@ const Dashboard = ({
                   )}
                 </td>
                 <td style={{ textAlign: 'center' }}>
-                  {inc.company_impact_status === 'Yes' && inc.detection_method === 'AI Map' ? (
-                    <span style={{ fontSize: '10px', color: '#818cf8', fontWeight: 800, background: 'rgba(99, 102, 241, 0.1)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(99, 102, 241, 0.2)' }}>True</span>
+                  {inc.company_impact_status === 'Yes' && inc.detection_method && inc.detection_method.includes('Version') ? (
+                    <span style={{ fontSize: '10px', color: '#f59e0b', fontWeight: 800, background: 'rgba(245, 158, 11, 0.1)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>True</span>
                   ) : (
                     <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>False</span>
                   )}

@@ -330,25 +330,17 @@ def check_heuristic_match(title: str, description: str, affected_products: list,
 
 def analyze_dynamic_impact(title: str, description: str, profile: dict, engine: str = 'all') -> dict:
     """
-    Dynamic Intelligence Engine v3.0:
-    Calculates threat proximity for a specific company profile.
+    Dynamic Intelligence Engine v4.0:
+    Tier 1: Heuristic (exact string match) — instant, deterministic.
+    Tier 2: Version Extractor (regex version range/wildcard/operator comparison) — fast, deterministic.
+    AI Engine has been removed.
     """
-    company_name = profile.get("company_name", "My Company")
+    from version_engine import scan_threat_version_aware
+    
     tech_stack = profile.get("tech_stack", [])
     industry = profile.get("industry", "Technology")
     
-    tech_stack_formatted = []
-    for t in tech_stack:
-        if isinstance(t, dict):
-            name = t.get('name', '')
-            version = t.get('version')
-            tech_stack_formatted.append(f"{name} (v{version})" if version else name)
-        else:
-            tech_stack_formatted.append(str(t))
-            
-    tech_stack_str = ", ".join(tech_stack_formatted)
-
-    # 1. HURISTIC PART: Header Match
+    # TIER 1: Original Heuristic — exact string match (untouched)
     if engine in ['all', 'heuristic']:
         h_match = check_heuristic_match(title, description, [], tech_stack)
         if h_match:
@@ -367,75 +359,35 @@ def analyze_dynamic_impact(title: str, description: str, profile: dict, engine: 
                 "method": "Heuristic"
             }
 
-    # 2. AI PART: Gemma Map
-    # Heuristic optimization: If description has direct matches, we boost the prompt
-    matched_tech = [t for t in tech_stack_formatted if t.lower() in (description or "").lower()]
+    # TIER 2: Version Extractor — regex-based version range/wildcard/operator matching
+    result = scan_threat_version_aware(
+        title=title,
+        description=description or "",
+        affected_products=[],
+        tech_stack=tech_stack,
+        industry=industry
+    )
     
-    prompt = f"""
-    You are a Senior Cyber Threat Intelligence Analyst for '{company_name}'.
-    Your company operates in the '{industry}' industry.
-    Your technology stack includes: {tech_stack_str}.
-    
-    TASK:
-    Analyze the following incident and determine its threat proximity to your organization.
-    
-    Incident Title: {title}
-    Incident Details: {description}
-    
-    Direct Tech Matches Found: {", ".join(matched_tech) if matched_tech else "None detected in text"}
-
-    CRITICAL CONTEXTUAL DIRECTIVE:
-    If your industry is 'Finance' or your company is a financial institution, you must aggressively flag threats known to target the financial sector (e.g., Banking Trojans, specific Ransomware strains, Swift network vulnerabilities, data exfiltration), even if your exact tech stack is not explicitly mentioned.
-    If you identify a threat impacting the financial institution, you MUST include the exact phrase "[FINANCIAL INSTITUTION IMPACT]" at the beginning of your reason.
-
-    CRITICAL: You must return a JSON object with exactly these three keys:
-    1. "status": Must be "Yes" or "No" (Is it a credible threat to your specific stack or industry?)
-    2. "score": A number from 0 to 100 representing proximity (100 = direct hit on your stack/industry, 0 = no relevance).
-    3. "reason": A 1-2 sentence explanation of the risk vector.
-    
-    Return ONLY the JSON. No markdown.
-    """
-    
-    try:
-        ollama_url = f"{os.getenv('OLLAMA_BASE_URL', 'http://127.0.0.1:11434')}/api/generate"
-        response = requests.post(ollama_url, json={
-            'model': 'gemma:2b',
-            'prompt': prompt,
-            'stream': False,
-            'format': 'json'
-        }, timeout=300)
-        
-        if response.status_code == 200:
-            raw_response = response.json().get('response', '{}').strip()
-            # Clean possible markdown
-            if raw_response.startswith('```json'): raw_response = raw_response[7:]
-            if raw_response.startswith('```'): raw_response = raw_response[3:]
-            if raw_response.endswith('```'): raw_response = raw_response[:-3]
-            
-            data = json.loads(raw_response.strip())
-            return {
-                "status": data.get("status", "No"),
-                "score": int(data.get("score", 0)),
-                "reason": data.get("reason", "Analysis complete."),
-                "method": "AI Map"
-            }
-    except Exception as e:
-        print(f"Dynamic Analysis Error: {e}")
-        
     return {
-        "status": "No",
-        "score": 0,
-        "reason": "Analysis failed or timed out.",
-        "method": "AI Map"
+        "status": result["status"],
+        "score": result["score"],
+        "reason": result["reason"],
+        "method": result["method"]
     }
 
 def analyze_cve_impact(cve_id: str, description: str, affected_products: list, profile: dict, engine: str = 'all') -> dict:
     """
-    Analyzes a CVE record for proximity to the company stack using Dual-Engine logic.
+    CVE Impact Analysis v4.0:
+    Tier 1: Heuristic (exact string match against affected products).
+    Tier 2: Version Extractor (version range/wildcard/operator comparison).
+    AI Engine has been removed.
     """
-    tech_stack = profile.get("tech_stack", [])
+    from version_engine import scan_threat_version_aware
     
-    # 1. HURISTIC PART: Header Match
+    tech_stack = profile.get("tech_stack", [])
+    industry = profile.get("industry", "Technology")
+    
+    # TIER 1: Original Heuristic — exact string match (untouched)
     if engine in ['all', 'heuristic']:
         h_match = check_heuristic_match(f"CVE Vulnerability: {cve_id}", description, affected_products, tech_stack)
         if h_match:
@@ -453,10 +405,22 @@ def analyze_cve_impact(cve_id: str, description: str, affected_products: list, p
                 "reason": "Deterministic scan found no exact matches in the asset inventory.",
                 "method": "Heuristic"
             }
-        
-    # 2. AI PART: Gemma Map
-    # Passes all headers and context for deep scoring
-    return analyze_dynamic_impact(f"CVE Vulnerability: {cve_id}", f"Affected: {affected_products}. {description}", profile, engine='ai')
+    
+    # TIER 2: Version Extractor
+    result = scan_threat_version_aware(
+        title=f"CVE Vulnerability: {cve_id}",
+        description=description or "",
+        affected_products=affected_products or [],
+        tech_stack=tech_stack,
+        industry=industry
+    )
+    
+    return {
+        "status": result["status"],
+        "score": result["score"],
+        "reason": result["reason"],
+        "method": result["method"]
+    }
 
 def analyze_mitre_ttp(title: str, description: str) -> list:
     """

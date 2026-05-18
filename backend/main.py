@@ -600,7 +600,7 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             
         query = db.query(models.Incident)
         if not full_scan:
-            target_method = "Heuristic" if engine == "heuristic" else "AI Map" if engine == "ai" else None
+            target_method = "Heuristic" if engine == "heuristic" else None
             if target_method:
                 query = query.filter((models.Incident.company_impact_status == None) | (models.Incident.detection_method != target_method))
             else:
@@ -618,7 +618,7 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             incident.company_impact_status = res["status"]
             incident.company_impact_reason = res["reason"]
             incident.company_impact_score = res["score"]
-            incident.detection_method = res.get("method", "AI Map")
+            incident.detection_method = res.get("method", "Heuristic (Version-Aware)")
             # Flag for manual review if score is high
             if res["score"] >= 70:
                 incident.impact_flag = 1
@@ -640,7 +640,7 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             
         query = db.query(models.CVE)
         if not full_scan:
-            target_method = "Heuristic" if engine == "heuristic" else "AI Map" if engine == "ai" else None
+            target_method = "Heuristic" if engine == "heuristic" else None
             if target_method:
                 query = query.filter((models.CVE.company_impact_reason == None) | (models.CVE.detection_method != target_method))
             else:
@@ -657,7 +657,7 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             res = analyze_cve_impact(cve.cve_id, cve.description or "", cve.affected_products or [], profile, engine)
             cve.company_impact_score = res["score"]
             cve.company_impact_reason = res["reason"]
-            cve.detection_method = res.get("method", "AI Map")
+            cve.detection_method = res.get("method", "Heuristic (Version-Aware)")
             if res["score"] >= 70:
                 cve.impact_flag = 1
                 cve.review_status = "Pending"

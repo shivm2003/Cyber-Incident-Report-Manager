@@ -625,10 +625,10 @@ function App() {
         fetch(`${API_BASE}/incidents?${countQuery}`),
         fetch(`${API_BASE}/cves?${countQuery}`)
       ]);
-      const allIncidentsData = await allIncidentsRes.json();
-      const allCvesData = await allCvesRes.json();
+      const allIncidentsData = (await allIncidentsRes.json()).data || [];
+      const allCvesData = (await allCvesRes.json()).data || [];
 
-      const targetMethod = engine === 'heuristic' ? 'Heuristic' : engine === 'ai' ? 'AI Map' : null;
+      const targetMethod = engine === 'heuristic' ? 'Heuristic' : engine === 'version' ? 'Heuristic (Version-Aware)' : null;
 
       const totalIncToScan = full ? allIncidentsData.length : allIncidentsData.filter(inc => !inc.company_impact_status || inc.company_impact_status === 'Pending' || (targetMethod && inc.detection_method !== targetMethod)).length;
       const totalCvesToScan = full ? allCvesData.length : allCvesData.filter(cve => !cve.company_impact_reason || (targetMethod && cve.detection_method !== targetMethod)).length;
@@ -655,8 +655,8 @@ function App() {
           fetch(`${API_BASE}/incidents?limit=2000`),
           fetch(`${API_BASE}/cves?limit=2000`)
         ]);
-        const currentData = await checkIncRes.json();
-        const currentCveData = await checkCveRes.json();
+        const currentData = (await checkIncRes.json()).data || [];
+        const currentCveData = (await checkCveRes.json()).data || [];
 
         const incYes = currentData.filter(inc => inc.company_impact_status === 'Yes' && (!targetMethod || inc.detection_method === targetMethod)).length;
         const incNo = currentData.filter(inc => inc.company_impact_status === 'No' && (!targetMethod || inc.detection_method === targetMethod)).length;
