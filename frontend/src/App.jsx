@@ -143,13 +143,29 @@ function App() {
   });
   const [cveTimeframe, setCveTimeframe] = useState('week');
 
+  // Pagination State
+  const [incidentPage, setIncidentPage] = useState(1);
+  const [incidentLimit, setIncidentLimit] = useState(50);
+  const [cvePage, setCvePage] = useState(1);
+  const [cveLimit, setCveLimit] = useState(50);
+  const [totalIncidents, setTotalIncidents] = useState(0);
+  const [totalCves, setTotalCves] = useState(0);
+
+  useEffect(() => {
+    setIncidentPage(1);
+  }, [searchTerm, filterSeverity, incidentDateFrom, incidentDateTo]);
+
+  useEffect(() => {
+    setCvePage(1);
+  }, [cveSearch, cveSeverityFilter, cveCompanyFilter, cveSourceFilter, cveDateFrom, cveDateTo]);
 
   const loadData = useCallback(async () => {
     try {
-      let incidentQuery = `limit=200`;
+      let incidentQuery = `limit=${incidentLimit}&skip=${(incidentPage - 1) * incidentLimit}`;
       if (view === 'india') incidentQuery += `&country=India`;
       if (view === 'financial') incidentQuery += `&is_financial=1`;
       if (filterSeverity !== 'All') incidentQuery += `&severity=${filterSeverity}`;
+      if (searchTerm) incidentQuery += `&search=${encodeURIComponent(searchTerm)}`;
 
       let fromDate = incidentDateFrom;
       let toDate = incidentDateTo;
@@ -158,7 +174,7 @@ function App() {
       if (toDate) incidentQuery += `&happened_to=${toDate}`;
 
       // Build CVE query string
-      let cveQuery = `sort_order=${cveSortOrder}&sort_by=${cveSortBy}`;
+      let cveQuery = `limit=${cveLimit}&skip=${(cvePage - 1) * cveLimit}&sort_order=${cveSortOrder}&sort_by=${cveSortBy}`;
       if (cveSeverityFilter !== 'All') cveQuery += `&severity=${cveSeverityFilter}`;
       if (cveCompanyFilter !== 'All') cveQuery += `&company=${encodeURIComponent(cveCompanyFilter)}`;
       if (cveSourceFilter !== 'All') cveQuery += `&source=${encodeURIComponent(cveSourceFilter)}`;
@@ -175,14 +191,16 @@ function App() {
       const iData = await iRes.json();
       const cData = await cRes.json();
       setStats(sData);
-      setIncidents(iData);
-      setCves(cData);
+      setIncidents(iData.data || iData);
+      setTotalIncidents(iData.total || (iData.data ? iData.data.length : iData.length));
+      setCves(cData.data || cData);
+      setTotalCves(cData.total || (cData.data ? cData.data.length : cData.length));
     } catch (e) {
       console.error("SOC DATA ERROR:", e);
     } finally {
       setLoading(false);
     }
-  }, [view, filterSeverity, incidentDateFrom, incidentDateTo, timeframe, cveSortOrder, cveSortBy, cveDateFrom, cveDateTo, cveSeverityFilter, cveCompanyFilter, cveSourceFilter, cveSearch, cveTimeframe]);
+  }, [view, filterSeverity, incidentDateFrom, incidentDateTo, timeframe, cveSortOrder, cveSortBy, cveDateFrom, cveDateTo, cveSeverityFilter, cveCompanyFilter, cveSourceFilter, cveSearch, cveTimeframe, incidentPage, incidentLimit, cvePage, cveLimit, searchTerm]);
 
   const loadAuditLogs = useCallback(async () => {
     try {
@@ -821,7 +839,7 @@ function App() {
           {view === 'overview' && (
             <Dashboard 
               stats={stats}
-              filtered={filtered}
+              incidents={incidents}
               severityData={severityData}
               geoData={geoData}
               intelMode={intelMode}
@@ -854,6 +872,11 @@ function App() {
               timeframe={timeframe}
               setTimeframe={setTimeframe}
               handleCompanyScan={handleCompanyScan}
+              incidentPage={incidentPage}
+              setIncidentPage={setIncidentPage}
+              incidentLimit={incidentLimit}
+              setIncidentLimit={setIncidentLimit}
+              totalIncidents={totalIncidents}
             />
           )}
 
@@ -921,6 +944,11 @@ function App() {
               setCveDateTo={setCveDateTo}
               handleCompanyScan={handleCompanyScan}
               handleOpenExtractor={(id) => { setExtractorCveId(id); setView('cve_extractor'); }}
+              cvePage={cvePage}
+              setCvePage={setCvePage}
+              cveLimit={cveLimit}
+              setCveLimit={setCveLimit}
+              totalCves={totalCves}
             />
           )}
 

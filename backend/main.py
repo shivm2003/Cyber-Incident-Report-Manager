@@ -222,8 +222,10 @@ def get_stats(db: Session = Depends(get_db)):
         "financial_sectors": sector_counts
     }
 
-@app.get("/api/cves", response_model=list[schemas.CVEResponse])
+@app.get("/api/cves")
 def get_cves(
+    skip: int = 0,
+    limit: int = 100,
     sort_order: str = "desc",
     date_from: str = None,
     date_to: str = None,
@@ -285,7 +287,9 @@ def get_cves(
     else:
         query = query.order_by(sort_field.asc())
 
-    return query.all()
+    total = query.count()
+    data = query.offset(skip).limit(limit).all()
+    return {"data": data, "total": total}
 
 @app.get("/api/cves/audit")
 def get_cve_audit(db: Session = Depends(get_db)):
@@ -478,7 +482,7 @@ def get_map_data(db: Session = Depends(get_db)):
         
     return locations
 
-@app.get("/api/incidents", response_model=list[schemas.Incident])
+@app.get("/api/incidents")
 def get_incidents(
     skip: int = 0, 
     limit: int = 100, 
@@ -490,6 +494,7 @@ def get_incidents(
     collected_from: str = None,
     collected_to: str = None,
     company_impact: str = None,
+    search: str = None,
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Incident)
@@ -539,7 +544,15 @@ def get_incidents(
     if company_impact:
         query = query.filter(models.Incident.company_impact_status == company_impact)
         
-    return query.order_by(models.Incident.date_collected.desc()).offset(skip).limit(limit).all()
+    if search:
+        query = query.filter(
+            (models.Incident.title.ilike(f"%{search}%")) |
+            (models.Incident.description.ilike(f"%{search}%"))
+        )
+        
+    total = query.count()
+    data = query.order_by(models.Incident.date_collected.desc()).offset(skip).limit(limit).all()
+    return {"data": data, "total": total}
 
 @app.get("/api/reports/download/{format}")
 def download_report(format: str, is_india: bool = False, db: Session = Depends(get_db)):

@@ -17,15 +17,34 @@ const SEVERITY_COLORS = {
 };
 
 const Dashboard = ({
-  view, stats, filtered, severityData, geoData, intelMode,
+  view, stats, incidents, severityData, geoData, intelMode,
   searchTerm, setSearchTerm, filterSeverity, setFilterSeverity,
   showFilters, setShowFilters, incidentDateFrom, setIncidentDateFrom,
   incidentDateTo, setIncidentDateTo, loadData, handleClearCrawl,
   handleDeleteIncident, handleRegenerateSummary, handleGenerateImpact,
   setSelectedRawIncident, setView, reports, setActiveReport,
   mitreMappings, generatingSummary, generatingReport, loading,
-  handleCollect, collecting, timeframe, setTimeframe, handleCompanyScan
+  handleCollect, collecting, timeframe, setTimeframe, handleCompanyScan,
+  incidentPage, setIncidentPage, incidentLimit, setIncidentLimit, totalIncidents
 }) => {
+  const totalPages = Math.max(1, Math.ceil(totalIncidents / incidentLimit));
+  
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+    let startPage = Math.max(1, incidentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = startPage + maxPagesToShow - 1;
+
+    if (endPage > totalPages) {
+      endPage = totalPages;
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    return pages;
+  };
 
   const renderStats = () => (
     <div className="stats-grid">
@@ -52,7 +71,7 @@ const Dashboard = ({
       />
       <StatCard 
         title="Intelligence Coverage" 
-        value={`${Math.min(100, Math.round((filtered.length / Math.max(1, stats.total)) * 100))}%`} 
+        value={`${Math.min(100, Math.round((totalIncidents / Math.max(1, stats.total)) * 100))}%`} 
         icon={Zap} 
         color="#8b5cf6" 
         detail="Active monitoring"
@@ -213,7 +232,7 @@ const Dashboard = ({
             </tr>
           </thead>
           <tbody>
-            {filtered.map(inc => (
+            {(incidents || []).map(inc => (
               <tr key={inc.id} className="intel-row" onClick={() => setSelectedRawIncident(inc)} style={{ cursor: 'pointer' }}>
                 <td><span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-muted)' }}>#{inc.id}</span></td>
                 <td>
@@ -347,6 +366,63 @@ const Dashboard = ({
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination Controls */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', padding: '12px 24px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Items per page:</span>
+          <select 
+            value={incidentLimit} 
+            onChange={(e) => { setIncidentLimit(Number(e.target.value)); setIncidentPage(1); }}
+            style={{ background: 'var(--bg-sidebar)', border: '1px solid var(--border)', color: 'var(--text-main)', borderRadius: '6px', padding: '4px 8px', fontSize: '12px' }}
+          >
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+          </select>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            Showing {(incidentPage - 1) * incidentLimit + 1} to {Math.min(incidentPage * incidentLimit, totalIncidents)} of {totalIncidents} entries
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button 
+            className="btn-ghost" 
+            disabled={incidentPage === 1}
+            onClick={() => setIncidentPage(prev => Math.max(prev - 1, 1))}
+            style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border)', opacity: incidentPage === 1 ? 0.5 : 1 }}
+          >
+            Previous
+          </button>
+          
+          {getPageNumbers().map(num => (
+            <button
+              key={num}
+              onClick={() => setIncidentPage(num)}
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                borderRadius: '6px',
+                border: incidentPage === num ? '1px solid var(--primary)' : '1px solid var(--border)',
+                background: incidentPage === num ? 'var(--primary)' : 'transparent',
+                color: incidentPage === num ? '#fff' : 'var(--text-main)',
+                cursor: 'pointer'
+              }}
+            >
+              {num}
+            </button>
+          ))}
+
+          <button 
+            className="btn-ghost" 
+            disabled={incidentPage === totalPages}
+            onClick={() => setIncidentPage(prev => Math.min(prev + 1, totalPages))}
+            style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border)', opacity: incidentPage === totalPages ? 0.5 : 1 }}
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
   );
