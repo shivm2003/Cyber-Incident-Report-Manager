@@ -31,6 +31,7 @@ import CompanyRadar from './pages/CompanyRadar';
 import ManualReview from './pages/ManualReview';
 import TechInventory from './pages/TechInventory';
 import CVEReportViewer from './pages/CVEReportViewer';
+import JiraPublisher from './pages/JiraPublisher';
 
 const API_BASE = 'http://localhost:8000/api';
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -803,6 +804,10 @@ function App() {
           <FilePlus size={18} color={view === 'report_builder' ? '#6366f1' : 'inherit'} /> Report Builder
         </div>
 
+        <div className={`nav-item ${view === 'jira' ? 'active' : ''}`} onClick={() => setView('jira')}>
+          <ArrowUpRight size={18} color={view === 'jira' ? '#a855f7' : 'inherit'} /> Jira Publisher
+        </div>
+
         <div className={`nav-item ${view === 'impact' ? 'active' : ''}`} onClick={() => setView('impact')}>
           <FileText size={18} /> Analysis Archive
         </div>
@@ -976,6 +981,10 @@ function App() {
                 extractorCveId={extractorCveId}
                 setExtractorCveId={setExtractorCveId}
             />
+          )}
+
+          {view === 'jira' && (
+            <JiraPublisher />
           )}
 
           {view === 'audit' && <AuditLogs auditLogs={auditLogs} />}

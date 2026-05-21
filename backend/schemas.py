@@ -238,3 +238,14 @@ class MitreCVEReport(BaseModel):
     cvss: MitreCVSS | None = None
     affected_products: list[MitreAffectedProduct] | None = []
     references: list[str] | None = []
+
+class JiraPublishRequest(BaseModel):
+    project_key: str = "CI"
+    issue_type: str = "Task"
+    summary: str
+    description: str
+    assignee_id: str = "6422be0257f0c028e2f71e9a"
+    impact: str = "Customer Impacted"
+    severity: str = "Critical"
+    remarks: str
+

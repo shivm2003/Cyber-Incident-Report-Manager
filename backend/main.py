@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 load_dotenv()
-from fastapi import FastAPI, Depends, BackgroundTasks, Response
+from fastapi import FastAPI, Depends, BackgroundTasks, Response, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -1079,6 +1079,78 @@ def publish_report(id: int, db: Session = Depends(get_db)):
     report.published = 1
     db.commit()
     return {"status": "published"}
+
+@app.post("/api/reports/{id}/jira")
+def publish_report_to_jira(
+    id: str,
+    project_key: str = Form(...),
+    issue_type: str = Form(...),
+    summary: str = Form(...),
+    description: str = Form(...),
+    impact: str = Form(...),
+    severity: str = Form(...),
+    remarks: str = Form(...),
+    assignee_id: str = Form(None),
+    attachments: list[UploadFile] = File(default=[]),
+    db: Session = Depends(get_db)
+):
+    from fastapi import HTTPException
+    
+    # Check if id represents a database ImpactReport
+    if id.isdigit() and id != "0":
+        report = db.query(models.ImpactReport).filter(models.ImpactReport.id == int(id)).first()
+        if not report:
+            raise HTTPException(status_code=404, detail="Report not found")
+    
+    from jira_publisher import create_jira_issue, upload_jira_attachments
+    try:
+        res = create_jira_issue(
+            project_key=project_key,
+            issue_type=issue_type,
+            summary=summary,
+            description=description,
+            assignee_id=assignee_id,
+            impact=impact,
+            severity=severity,
+            remarks=remarks
+        )
+        if res["success"]:
+            ticket_key = res["data"]["key"]
+            
+            # Process attachments if present
+            if attachments:
+                files_payload = []
+                for attach in attachments:
+                    if attach.filename:
+                        content = attach.file.read()
+                        files_payload.append(
+                            ('file', (attach.filename, content, attach.content_type))
+                        )
+                if files_payload:
+                    upload_res = upload_jira_attachments(ticket_key, files_payload)
+                    if not upload_res["success"]:
+                        return {
+                            "success": True, 
+                            "ticket_key": ticket_key, 
+                            "attachment_error": upload_res["error"]
+                        }
+            
+            return {"success": True, "ticket_key": ticket_key}
+        else:
+            return {"success": False, "status_code": res["status_code"], "error": res["error"]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/jira/projects")
+def get_jira_projects_endpoint():
+    from fastapi import HTTPException
+    from jira_publisher import get_jira_projects
+    try:
+        projects = get_jira_projects()
+        return projects
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/reports/{id}")
 def delete_report(id: int, db: Session = Depends(get_db)):
