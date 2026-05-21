@@ -26,6 +26,9 @@ class IncidentBase(BaseModel):
     raw_data: dict | list | None = None
     full_analysis: str | None = None
     crawled_content: str | None = None
+    extracted_versions: dict | list | None = None
+    heuristic_match_details: dict | list | None = None
+    version_relevance: int | None = 0
 
 class IncidentCreate(IncidentBase):
     pass
@@ -96,6 +99,9 @@ class CVEResponse(CVEBase):
     impact_flag: int | None = 0
     detection_method: str | None = None
     scan_iteration: int | None = 0
+    extracted_versions: dict | list | None = None
+    heuristic_match_details: dict | list | None = None
+    version_relevance: int | None = 0
 
     class Config:
         from_attributes = True

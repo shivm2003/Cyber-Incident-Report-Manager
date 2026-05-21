@@ -85,6 +85,29 @@ const ManualReviewQueueUI = ({ queue, onUpdateStatus, onSelectItem }) => {
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }} className="text-truncate-2">
                     {item.description}
                   </div>
+                  {item.extracted_versions && Object.keys(item.extracted_versions).length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '10px' }}>
+                      {Object.entries(item.extracted_versions).map(([prod, vers]) => (
+                        <span key={prod} style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', fontSize: '9px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                          {prod} Threat Range: {Array.isArray(vers) ? vers.join(', ') : vers}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {item.heuristic_match_details && item.heuristic_match_details.length > 0 && (
+                    <div style={{ marginTop: '12px', borderTop: '1px dashed var(--border)', paddingTop: '8px' }}>
+                      <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>Version Overlaps:</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {item.heuristic_match_details.map((m, idx) => (
+                          <div key={idx} style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: '#f59e0b', fontWeight: 700 }}>• {m.product}</span>
+                            <span style={{ color: 'var(--text-muted)' }}>({m.inventory_version} matches threat {m.threat_versions})</span>
+                            <span style={{ fontSize: '9px', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase' }}>{m.match_type.replace('_', ' ')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </td>
                 <td>
                   <div style={{ 

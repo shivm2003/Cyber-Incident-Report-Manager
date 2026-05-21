@@ -27,7 +27,7 @@ def test_ollama():
             'prompt': prompt,
             'stream': False,
             'format': 'json'
-        }, timeout=90)
+        }, timeout=600)
         print(f"Status: {response.status_code}")
         
         raw_text = response.json().get('response', '{}')

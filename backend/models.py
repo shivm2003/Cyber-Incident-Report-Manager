@@ -29,6 +29,9 @@ class Incident(Base):
     impact_flag = Column(Integer, default=0) # 1 if high impact, 0 otherwise
     detection_method = Column(String, nullable=True) # Heuristic (Version-Aware), Heuristic (Industry-Match)
     scan_iteration = Column(Integer, default=0) # Track which scan iteration detected this
+    extracted_versions = Column(JSON, nullable=True)
+    heuristic_match_details = Column(JSON, nullable=True)
+    version_relevance = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     raw_data = Column(JSON, nullable=True) # Full payload from source
     full_analysis = Column(String, nullable=True) # 500+ word AI analysis
@@ -93,6 +96,9 @@ class CVE(Base):
     impact_flag = Column(Integer, default=0) # 1 if high impact, 0 otherwise
     detection_method = Column(String, nullable=True) # Heuristic (Version-Aware), Heuristic (Industry-Match)
     scan_iteration = Column(Integer, default=0) # Track which scan iteration detected this
+    extracted_versions = Column(JSON, nullable=True)
+    heuristic_match_details = Column(JSON, nullable=True)
+    version_relevance = Column(Integer, default=0)
     
     # AI Enriched Fields
     company_name = Column(String, index=True, nullable=True)

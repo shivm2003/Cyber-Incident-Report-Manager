@@ -158,7 +158,7 @@ function App() {
 
   useEffect(() => {
     setCvePage(1);
-  }, [cveSearch, cveSeverityFilter, cveCompanyFilter, cveSourceFilter, cveDateFrom, cveDateTo]);
+  }, [cveSearch, cveSeverityFilter, cveCompanyFilter, cveSourceFilter, cveDateFrom, cveDateTo, cveSortBy, cveSortOrder]);
 
   const loadData = useCallback(async () => {
     try {
@@ -964,6 +964,10 @@ function App() {
               cveLimit={cveLimit}
               setCveLimit={setCveLimit}
               totalCves={totalCves}
+              cveSortBy={cveSortBy}
+              setCveSortBy={setCveSortBy}
+              cveSortOrder={cveSortOrder}
+              setCveSortOrder={setCveSortOrder}
             />
           )}
 

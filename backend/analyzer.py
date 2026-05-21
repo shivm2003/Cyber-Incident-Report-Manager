@@ -518,7 +518,7 @@ CVE: {clean_html(description)[:1000]}
 
 OUTPUT:"""
 
-    resp = call_ollama(prompt, timeout=90, format_json=True, max_retries=1)
+    resp = call_ollama(prompt, timeout=600, format_json=True, max_retries=1)
     if resp.startswith('ERROR:'):
         return None
 
@@ -561,11 +561,24 @@ def analyze_dynamic_impact(title: str, description: str, profile: dict, engine: 
         title=title, description=description or '',
         affected_products=[], tech_stack=tech_stack, industry=industry
     )
+    
+    extracted = {}
+    for m in result.get('matches', []):
+        prod = m['product']
+        t_v = m['threat_versions']
+        if prod not in extracted:
+            extracted[prod] = []
+        if t_v not in extracted[prod]:
+            extracted[prod].append(t_v)
+            
     return {
         'status': result['status'],
         'score': result['score'],
         'reason': result['reason'],
-        'method': result['method']
+        'method': result['method'],
+        'extracted_versions': extracted,
+        'heuristic_match_details': result.get('matches', []),
+        'version_relevance': result['score'] if result['status'] == 'Yes' else 0
     }
 
 
@@ -577,9 +590,22 @@ def analyze_cve_impact(cve_id: str, description: str, affected_products: list, p
         title=f'CVE Vulnerability: {cve_id}', description=description or '',
         affected_products=affected_products or [], tech_stack=tech_stack, industry=industry
     )
+    
+    extracted = {}
+    for m in result.get('matches', []):
+        prod = m['product']
+        t_v = m['threat_versions']
+        if prod not in extracted:
+            extracted[prod] = []
+        if t_v not in extracted[prod]:
+            extracted[prod].append(t_v)
+            
     return {
         'status': result['status'],
         'score': result['score'],
         'reason': result['reason'],
-        'method': result['method']
+        'method': result['method'],
+        'extracted_versions': extracted,
+        'heuristic_match_details': result.get('matches', []),
+        'version_relevance': result['score'] if result['status'] == 'Yes' else 0
     }

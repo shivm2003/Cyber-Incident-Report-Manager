@@ -18,7 +18,10 @@ def migrate():
             ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
             ("raw_data", "JSON"),
             ("full_analysis", "VARCHAR"),
-            ("crawled_content", "VARCHAR")
+            ("crawled_content", "VARCHAR"),
+            ("extracted_versions", "JSON"),
+            ("heuristic_match_details", "JSON"),
+            ("version_relevance", "INTEGER DEFAULT 0")
         ],
         "cves": [
             ("company_impact_score", "INTEGER DEFAULT 0"),
@@ -35,7 +38,10 @@ def migrate():
             ("pull_params", "JSON"),
             ("search_session_id", "VARCHAR"),
             ("raw_data", "JSON"),
-            ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+            ("extracted_versions", "JSON"),
+            ("heuristic_match_details", "JSON"),
+            ("version_relevance", "INTEGER DEFAULT 0")
         ],
         "company_profiles": [
             ("company_name", "VARCHAR"),

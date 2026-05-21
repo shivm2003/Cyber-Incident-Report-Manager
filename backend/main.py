@@ -281,11 +281,19 @@ def get_cves(
     sort_field = models.CVE.published_date
     if sort_by == "created_at":
         sort_field = models.CVE.created_at
+    elif sort_by == "version_relevance":
+        sort_field = models.CVE.version_relevance
 
-    if sort_order == "desc":
-        query = query.order_by(sort_field.desc())
+    if sort_by == "version_relevance":
+        if sort_order == "desc":
+            query = query.order_by(models.CVE.version_relevance.desc(), models.CVE.published_date.desc())
+        else:
+            query = query.order_by(models.CVE.version_relevance.asc(), models.CVE.published_date.asc())
     else:
-        query = query.order_by(sort_field.asc())
+        if sort_order == "desc":
+            query = query.order_by(sort_field.desc())
+        else:
+            query = query.order_by(sort_field.asc())
 
     total = query.count()
     data = query.offset(skip).limit(limit).all()
@@ -508,6 +516,8 @@ def get_incidents(
     collected_to: str = None,
     company_impact: str = None,
     search: str = None,
+    sort_by: str = "date_collected",
+    sort_order: str = "desc",
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Incident)
@@ -563,8 +573,26 @@ def get_incidents(
             (models.Incident.description.ilike(f"%{search}%"))
         )
         
+    # Sorting
+    sort_field = models.Incident.date_collected
+    if sort_by == "happened_at":
+        sort_field = models.Incident.happened_at
+    elif sort_by == "version_relevance":
+        sort_field = models.Incident.version_relevance
+
+    if sort_by == "version_relevance":
+        if sort_order == "desc":
+            query = query.order_by(models.Incident.version_relevance.desc(), models.Incident.date_collected.desc())
+        else:
+            query = query.order_by(models.Incident.version_relevance.asc(), models.Incident.date_collected.asc())
+    else:
+        if sort_order == "desc":
+            query = query.order_by(sort_field.desc())
+        else:
+            query = query.order_by(sort_field.asc())
+
     total = query.count()
-    data = query.order_by(models.Incident.date_collected.desc()).offset(skip).limit(limit).all()
+    data = query.offset(skip).limit(limit).all()
     return {"data": data, "total": total}
 
 @app.get("/api/reports/download/{format}")
@@ -681,6 +709,9 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             incident.company_impact_score = res["score"]
             incident.detection_method = res.get("method", "Heuristic (Version-Aware)")
             incident.scan_iteration = current_iteration
+            incident.extracted_versions = res.get("extracted_versions")
+            incident.heuristic_match_details = res.get("heuristic_match_details")
+            incident.version_relevance = res.get("version_relevance", 0)
             # Flag for manual review if score is high
             if res["score"] >= 70:
                 incident.impact_flag = 1
@@ -724,6 +755,9 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             cve.company_impact_reason = res["reason"]
             cve.detection_method = res.get("method", "Heuristic (Version-Aware)")
             cve.scan_iteration = current_iteration
+            cve.extracted_versions = res.get("extracted_versions")
+            cve.heuristic_match_details = res.get("heuristic_match_details")
+            cve.version_relevance = res.get("version_relevance", 0)
             if res["score"] >= 70:
                 cve.impact_flag = 1
                 cve.review_status = "Pending"
