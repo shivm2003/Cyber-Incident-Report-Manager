@@ -78,7 +78,7 @@ function App() {
   });
   const [loading, setLoading] = useState(true);
   const [collecting, setCollecting] = useState(false);
-  const [aiStatus, setAiStatus] = useState({ online: false, model: 'gemma:2b', available: false });
+  const [aiStatus, setAiStatus] = useState({ online: false, model: 'gemma4:e4b', available: false });
   const [showAiWorkflow, setShowAiWorkflow] = useState(false);
   const [workflowData, setWorkflowData] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -259,7 +259,7 @@ function App() {
       const data = await res.json();
       setAiStatus(data);
     } catch (e) {
-      setAiStatus({ online: false, model: 'gemma:2b', available: false });
+      setAiStatus({ online: false, model: 'gemma4:e4b', available: false });
     }
   }, []);
 
@@ -838,7 +838,7 @@ function App() {
                 transition: 'all 0.3s ease'
               }} className={aiStatus.online ? "animate-pulse" : ""}></div>
               <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '0.5px' }}>
-                GEMMA AI: <span style={{ color: aiStatus.online ? '#10b981' : '#ef4444' }}>{aiStatus.online ? 'ONLINE' : 'OFFLINE'}</span>
+                AI MODEL ({aiStatus.model || 'gemma4:e4b'}): <span style={{ color: aiStatus.online ? '#10b981' : '#ef4444' }}>{aiStatus.online ? 'ONLINE' : 'OFFLINE'}</span>
               </span>
             </div>
 
@@ -1011,6 +1011,7 @@ function App() {
           data={workflowData}
           onClose={() => setShowAiWorkflow(false)}
           theme={theme}
+          model={aiStatus.model}
         />
       )}
 

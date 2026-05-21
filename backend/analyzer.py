@@ -9,7 +9,7 @@ load_dotenv()
 
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://127.0.0.1:11434')
 OLLAMA_API_URL = f"{OLLAMA_BASE_URL}/api/generate"
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'gemma:2b')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'gemma4:e4b')
 
 # ============================================================================
 # CORE UTILITIES
@@ -285,16 +285,18 @@ def classify_attack(title: str, description: str) -> dict:
     else:
         heuristic_summary = title
 
-    # AI Enhancement with simpler prompt for 2B models
+    # AI Enhancement (Professional Brief)
     ai_summary = ''
     safe_desc = clean_html(description or '')
     prompt = (
-        f'Analyze this cyber incident in 2 short sentences for a CISO:\n'
+        f'Analyze this cyber incident:\n'
         f'Title: {title}\n'
-        f'Details: {safe_desc[:600]}\n'
-        f'Focus on facts, exposure, and immediate relevance.'
+        f'Details: {safe_desc}\n\n'
+        f'Write a professional, 2-sentence "Executive Intelligence Brief" for a CISO. '
+        f'Focus on facts, technical exposure, and immediate relevance. '
+        f'Return ONLY the 2 sentences. No intro. No markdown.'
     )
-    resp = call_ollama(prompt, timeout=60, format_json=False, max_retries=1)
+    resp = call_ollama(prompt, timeout=120, format_json=False, max_retries=1)
     if not resp.startswith('ERROR:'):
         ai_summary = clean_html(resp)
     else:
@@ -312,7 +314,6 @@ def classify_attack(title: str, description: str) -> dict:
         "threat_level": threat_level,
         "impact_summary": impact_summary
     }
-
 
 # ============================================================================
 # IMPROVED: analyze_deep_impact (template-filling approach)

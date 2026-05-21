@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, ChevronRight, RefreshCw } from 'lucide-react';
 
-const AIWorkflowModal = ({ data, onClose, theme }) => {
+const AIWorkflowModal = ({ data, onClose, theme, model }) => {
   if (!data) return null;
 
   return (
@@ -58,7 +58,7 @@ const AIWorkflowModal = ({ data, onClose, theme }) => {
           <div style={{ marginBottom: '40px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
               <div style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 900 }}>2</div>
-              <h3 style={{ margin: 0, fontSize: '15px', color: '#fff' }}>Stage: LLM Reasoning (Gemma 2B)</h3>
+              <h3 style={{ margin: 0, fontSize: '15px', color: '#fff' }}>Stage: LLM Reasoning ({model || 'gemma4:e4b'})</h3>
             </div>
             <div style={{ padding: '20px', background: '#121218', border: '1px solid #1e1e26', borderRadius: '12px', position: 'relative' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>

@@ -20,7 +20,7 @@ def test_ollama():
         Return ONLY the JSON. No markdown. No intro.
         """
         base_url = os.getenv('OLLAMA_BASE_URL', 'http://127.0.0.1:11434')
-        model = os.getenv('OLLAMA_MODEL', 'gemma:2b')
+        model = os.getenv('OLLAMA_MODEL', 'gemma4:e4b')
         
         response = requests.post(f'{base_url}/api/generate', json={
             'model': model,
