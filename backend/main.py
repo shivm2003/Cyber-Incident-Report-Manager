@@ -950,6 +950,19 @@ def analyze_incident_impact(incident_id: int, db: Session = Depends(get_db)):
         print("[-] Incident not found!")
         raise HTTPException(status_code=404, detail="Incident not found")
     
+    # Automatically crawl the source link if it has not been crawled yet
+    if incident.link and not incident.crawled_content:
+        print(f"[*] Incident has not been crawled yet. Crawling link: {incident.link}...")
+        try:
+            from crawler import fetch_article_content
+            crawled = fetch_article_content(incident.link)
+            if crawled:
+                incident.crawled_content = crawled
+                db.commit()
+                print("[+] Auto-crawling complete!")
+        except Exception as e:
+            print(f"[-] Auto-crawling failed: {e}")
+            
     print(f"[*] Sending details to Shivam AI for Deep-Dive Analysis...")
     print(f"[*] (Please wait, local model generation may take 1-5 minutes)")
     from analyzer import analyze_deep_impact

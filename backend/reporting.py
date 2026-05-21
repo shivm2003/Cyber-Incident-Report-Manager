@@ -219,12 +219,13 @@ def generate_single_impact_pdf(report, mitre_mappings, forensic_content=None):
         sev = (incident.severity or "Low").upper()
         sev_color = "#ef4444" if sev == "CRITICAL" else ("#f59e0b" if sev == "HIGH" else "#6366f1")
         
+        source_para = f"{incident.source or 'Unknown'} (<a href='{incident.link}' color='blue'>Source Link</a>)" if incident.link else (incident.source or "Unknown")
         meta_data = [
-            [Paragraph("<b>SOURCE</b>", body_style), Paragraph(incident.source or "Unknown", body_style)],
+            [Paragraph("<b>SOURCE</b>", body_style), Paragraph(source_para, body_style)],
             [Paragraph("<b>SEVERITY</b>", body_style), Paragraph(f"<font color='{sev_color}'><b>{sev}</b></font>", body_style)],
             [Paragraph("<b>ENTITY</b>", body_style), Paragraph(incident.target_entity or incident.country, body_style)],
-            [Paragraph("<b>INCIDENT DATE</b>", body_style), Paragraph(incident.happened_at.strftime("%Y-%m-%d") if incident.happened_at else "Unknown", body_style)],
-            [Paragraph("<b>CAPTURED DATE</b>", body_style), Paragraph(incident.date_collected.strftime("%Y-%m-%d"), body_style)],
+            [Paragraph("<b>INCIDENT DATE</b>", body_style), Paragraph(incident.happened_at.strftime("%Y-%m-%d %H:%M") if incident.happened_at else "Unknown", body_style)],
+            [Paragraph("<b>CAPTURED DATE</b>", body_style), Paragraph(incident.date_collected.strftime("%Y-%m-%d %H:%M"), body_style)],
             [Paragraph("<b>METHOD</b>", body_style), Paragraph(report.breach_method or "Unknown", body_style)]
         ]
         t = Table(meta_data, colWidths=[120, 360])
@@ -334,13 +335,43 @@ def generate_single_impact_pdf(report, mitre_mappings, forensic_content=None):
     
     # Breach Process
     elements.append(Paragraph("BREACH TIMELINE & PROCESS", header_style))
-    elements.append(Paragraph(report.breach_process or "No timeline available.", body_style))
+    process_data = report.breach_process
+    steps = []
+    if process_data:
+        import json
+        try:
+            parsed = json.loads(process_data)
+            if isinstance(parsed, list):
+                steps = parsed
+            elif isinstance(parsed, dict):
+                steps = list(parsed.values())
+        except Exception:
+            if isinstance(process_data, str):
+                steps = [s.strip() for s in process_data.split('\n') if s.strip()]
+    
+    if steps:
+        for idx, step in enumerate(steps, 1):
+            step_text = f"<b>{idx}.</b> {step}"
+            elements.append(Paragraph(step_text, body_style))
+            elements.append(Spacer(1, 4))
+    else:
+        elements.append(Paragraph("No timeline available.", body_style))
     elements.append(Spacer(1, 20))
 
     # Executive Statement
     elements.append(Paragraph("EXECUTIVE STATEMENT", header_style))
     elements.append(Paragraph(f'"{report.official_report}"', ParagraphStyle('ExecStyle', parent=body_style, fontName='Helvetica-Oblique')))
     elements.append(Spacer(1, 20))
+    
+    # Crawled Intelligence Source Content
+    if incident and incident.crawled_content:
+        elements.append(Paragraph("CRAWLED INTELLIGENCE SOURCE CONTENT", header_style))
+        for p_text in incident.crawled_content.split('\n'):
+            p_text = p_text.strip()
+            if p_text:
+                elements.append(Paragraph(p_text, ParagraphStyle('CrawledStyle', parent=body_style, fontSize=9, textColor=colors.HexColor("#4b5563"))))
+                elements.append(Spacer(1, 4))
+        elements.append(Spacer(1, 20))
     
     # Footer Section
     elements.append(Spacer(1, 40))
@@ -388,11 +419,12 @@ def generate_single_impact_docx(report, mitre_mappings, forensic_content=None):
         cell.paragraphs[0].runs[0].font.size = Pt(9)
 
     if incident:
-        fill_cell(0, 0, "Source:", incident.source)
+        source_val = f"{incident.source or 'Unknown'} (Link: {incident.link})" if incident.link else (incident.source or "Unknown")
+        fill_cell(0, 0, "Source:", source_val)
         fill_cell(0, 2, "Severity:", (incident.severity or "Low").upper())
         fill_cell(1, 0, "Entity:", incident.target_entity or incident.country)
-        fill_cell(1, 2, "Incident Date:", incident.happened_at.strftime("%Y-%m-%d") if incident.happened_at else "Recent")
-        fill_cell(2, 0, "Captured Date:", incident.date_collected.strftime("%Y-%m-%d"))
+        fill_cell(1, 2, "Incident Date:", incident.happened_at.strftime("%Y-%m-%d %H:%M") if incident.happened_at else "Recent")
+        fill_cell(2, 0, "Captured Date:", incident.date_collected.strftime("%Y-%m-%d %H:%M"))
         fill_cell(2, 2, "Breach Method:", report.breach_method)
 
     doc.add_paragraph()
@@ -482,12 +514,40 @@ def generate_single_impact_docx(report, mitre_mappings, forensic_content=None):
             
     # Breach Process
     doc.add_heading('BREACH TIMELINE & PROCESS', level=2)
-    doc.add_paragraph(report.breach_process or "No timeline available.")
+    process_data = report.breach_process
+    steps = []
+    if process_data:
+        import json
+        try:
+            parsed = json.loads(process_data)
+            if isinstance(parsed, list):
+                steps = parsed
+            elif isinstance(parsed, dict):
+                steps = list(parsed.values())
+        except Exception:
+            if isinstance(process_data, str):
+                steps = [s.strip() for s in process_data.split('\n') if s.strip()]
+    if steps:
+        for idx, step in enumerate(steps, 1):
+            doc.add_paragraph(f"{idx}. {step}")
+    else:
+        doc.add_paragraph("No timeline available.")
     
     # Executive Statement
     doc.add_heading('EXECUTIVE STATEMENT', level=2)
     p = doc.add_paragraph()
     p.add_run(f'"{report.official_report}"').italic = True
+
+    # Crawled Intelligence Source Content
+    if incident and incident.crawled_content:
+        doc.add_heading('CRAWLED INTELLIGENCE SOURCE CONTENT', level=2)
+        for line in incident.crawled_content.split('\n'):
+            line = line.strip()
+            if line:
+                p_crawled = doc.add_paragraph(line)
+                for run in p_crawled.runs:
+                    run.font.size = Pt(9)
+                    run.font.color.rgb = RGBColor(0x64, 0x74, 0x8b)
 
 
     # Footer
