@@ -327,7 +327,20 @@ def get_cve_audit(db: Session = Depends(get_db)):
 @app.get("/api/companies", response_model=list[schemas.CompanyResponse])
 def get_companies(db: Session = Depends(get_db)):
     """Fetches the list of companies tracked in the vulnerability database."""
-    return db.query(models.Company).order_by(models.Company.total_cves.desc()).all()
+    comps = db.query(models.Company).order_by(models.Company.total_cves.desc()).all()
+    result = []
+    for c in comps:
+        result.append({
+            "id": c.id,
+            "name": c.name or "",
+            "total_cves": c.total_cves or 0,
+            "critical_cves": c.critical_cves or 0,
+            "high_cves": c.high_cves or 0,
+            "latest_cve": c.latest_cve,
+            "vulnerability_types": c.vulnerability_types or [],
+            "last_updated": c.last_updated
+        })
+    return result
 
 @app.get("/api/cves/nvd/{cve_id}", response_model=schemas.CVEResponse)
 def get_nvd_cve(cve_id: str, db: Session = Depends(get_db)):

@@ -2,33 +2,197 @@ import re
 import requests
 import json
 import os
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
 
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://127.0.0.1:11434')
 OLLAMA_API_URL = f"{OLLAMA_BASE_URL}/api/generate"
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'gemma:2b')
+
+# ============================================================================
+# CORE UTILITIES
+# ============================================================================
 
 def clean_html(text: str) -> str:
-    """Utility to strip HTML tags and clean whitespace."""
     if not text:
         return ""
-    # Basic regex to strip tags (lightweight, no bs4 dependency needed here)
     clean = re.compile('<.*?>')
     text = re.sub(clean, ' ', text)
-    # Clean up whitespace
     text = ' '.join(text.split())
     return text
 
+
+def truncate_text(text: str, max_chars: int = 2000) -> str:
+    if not text:
+        return ""
+    text = text.strip()
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars].rstrip() + "\n... [truncated]"
+
+
+def _shorten_value(value, max_chars: int = 300):
+    if isinstance(value, str):
+        return truncate_text(clean_html(value), max_chars)
+    if isinstance(value, (int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        shortened = {}
+        for key, val in list(value.items())[:10]:
+            shortened[key] = _shorten_value(val, max_chars=max_chars // 2)
+        return shortened
+    if isinstance(value, list):
+        return [_shorten_value(item, max_chars=max_chars // 2) for item in value[:10]]
+    return truncate_text(str(value), max_chars)
+
+
+def summarize_raw_data(raw_data, max_chars: int = 2500) -> str:
+    if not raw_data:
+        return "No raw JSON data available."
+    try:
+        raw_json = json.dumps(raw_data, indent=2)
+    except Exception:
+        raw_json = str(raw_data)
+    if len(raw_json) <= max_chars:
+        return raw_json
+    if isinstance(raw_data, dict):
+        truncated = {}
+        for key, value in raw_data.items():
+            truncated[key] = _shorten_value(value, max_chars=max_chars // 4)
+            if len(json.dumps(truncated, indent=2)) > max_chars:
+                truncated[key] = "... [truncated]"
+                break
+        raw_json = json.dumps(truncated, indent=2)
+    elif isinstance(raw_data, list):
+        truncated = [_shorten_value(item, max_chars=max_chars // 4) for item in raw_data[:10]]
+        raw_json = json.dumps(truncated, indent=2)
+    if len(raw_json) > max_chars:
+        raw_json = raw_json[:max_chars].rstrip() + "\n... [truncated]"
+    return raw_json
+
+
+# ============================================================================
+# ROBUST JSON EXTRACTOR & OLLAMA CLIENT
+# ============================================================================
+
+def robust_json_extract(text: str):
+    """
+    Extract JSON from messy model output.
+    Handles markdown fences, trailing commas, and nested structures.
+    """
+    if not text:
+        return None
+    text = text.strip()
+
+    # Strip markdown fences
+    text = re.sub(r'^```(?:json)?\s*', '', text)
+    text = re.sub(r'\s*```$', '', text)
+    text = text.strip()
+
+    # Direct parse attempt
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Find outermost JSON object or array by brace counting
+    def _find_boundary(char_open, char_close):
+        start = text.find(char_open)
+        if start == -1:
+            return None
+        count = 0
+        in_string = False
+        escape = False
+        for i in range(start, len(text)):
+            ch = text[i]
+            if escape:
+                escape = False
+                continue
+            if ch == '\\':
+                escape = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if not in_string:
+                if ch == char_open:
+                    count += 1
+                elif ch == char_close:
+                    count -= 1
+                    if count == 0:
+                        return text[start:i+1]
+        return None
+
+    for opener, closer in [('{', '}'), ('[', ']')]:
+        snippet = _find_boundary(opener, closer)
+        if snippet:
+            try:
+                return json.loads(snippet)
+            except json.JSONDecodeError:
+                # Try aggressive repair: remove trailing commas before } or ]
+                repaired = re.sub(r',(\s*[}\]])', r'\1', snippet)
+                try:
+                    return json.loads(repaired)
+                except json.JSONDecodeError:
+                    continue
+    return None
+
+
+def call_ollama(prompt: str, model: str = None, timeout: int = 120,
+                format_json: bool = True, max_retries: int = 2) -> str:
+    """
+    Call Ollama with health checks, retries, and clear error strings.
+    Returns response text, or a string starting with 'ERROR:' on failure.
+    """
+    model = model or OLLAMA_MODEL
+
+    # Health check
+    try:
+        health = requests.get(f'{OLLAMA_BASE_URL}/api/tags', timeout=5)
+        if health.status_code != 200:
+            return f'ERROR: Ollama not reachable at {OLLAMA_BASE_URL} (status {health.status_code})'
+        available = [m.get('name', '') for m in health.json().get('models', [])]
+        if not any(model in a for a in available):
+            return f'ERROR: Model {model} not found. Available: {available}'
+    except Exception as e:
+        return f'ERROR: Cannot connect to Ollama: {e}'
+
+    payload = {
+        'model': model,
+        'prompt': prompt,
+        'stream': False,
+    }
+    if format_json:
+        payload['format'] = 'json'
+
+    last_error = None
+    for attempt in range(max_retries + 1):
+        try:
+            response = requests.post(OLLAMA_API_URL, json=payload, timeout=timeout)
+            if response.status_code == 200:
+                return response.json().get('response', '').strip()
+            last_error = f'HTTP {response.status_code}: {response.text[:200]}'
+        except requests.exceptions.Timeout:
+            last_error = f'Timeout after {timeout}s'
+            timeout += 60  # Increase timeout for next retry
+        except Exception as e:
+            last_error = str(e)
+
+        if attempt < max_retries:
+            time.sleep(1)
+
+    return f'ERROR: {last_error}'
+
+
+# ============================================================================
+# IMPROVED: classify_attack
+# ============================================================================
+
 def classify_attack(title: str, description: str) -> dict:
-    """
-    Hybrid Intelligence Engine:
-    - Heuristics: Instant metadata extraction (Attack Type, Country, Bank Name).
-    - Report AI: Professional summarization (Executive Brief).
-    """
-    text = f"{title} {description or ''}".lower()
-    
-    # 1. Attack Type Classification
+    text = f'{title} {description or ""}'.lower()
+
     attack_patterns = {
         "Ransomware": ["ransomware", "encrypt", "lockbit", "blackcat", "extortion", "ransom"],
         "Phishing": ["phishing", "credential", "spoof", "email scam", "smishing"],
@@ -37,37 +201,33 @@ def classify_attack(title: str, description: str) -> dict:
         "Supply Chain": ["supply chain", "vendor", "third party", "software update", "upstream"],
         "Malware": ["malware", "virus", "trojan", "spyware", "backdoor", "stealer"]
     }
-    
-    attack_type = "Unknown"
+
+    attack_type = 'Unknown'
     for type_name, keywords in attack_patterns.items():
         if any(kw in text for kw in keywords):
             attack_type = type_name
             break
 
-    # 2. Country Detection
-    india_keywords = ["india", "indian", "mumbai", "delhi", "bengaluru", "chennai", "rbi", "upi", "cert-in", "nciipc"]
-    country = "India" if any(kw in text for kw in india_keywords) else "Global"
+    india_keywords = ['india', 'indian', 'mumbai', 'delhi', 'bengaluru', 'chennai', 'rbi', 'upi', 'cert-in', 'nciipc']
+    country = 'India' if any(kw in text for kw in india_keywords) else 'Global'
 
-    # 3. Financial Intelligence
-    financial_keywords = ["bank", "payment", "fintech", "stock market", "insurance", "atm", "transaction", "lending", "credit card"]
+    financial_keywords = ['bank', 'payment', 'fintech', 'stock market', 'insurance', 'atm', 'transaction', 'lending', 'credit card']
     is_financial = 1 if any(kw in text for kw in financial_keywords) else 0
-    
+
     financial_sectors = {
         "Banking": ["bank", "rbi", "sbi", "hdfc", "icici", "axis", "kotak", "atm"],
         "Fintech": ["payment", "wallet", "upi", "paytm", "phonepe", "stripe", "razorpay"],
         "Stock Market": ["stock", "market", "sebi", "nse", "bse", "trading", "broker"],
         "Insurance": ["insurance", "policy", "claim", "lic"]
     }
-    
-    financial_sector = "None"
+    financial_sector = 'None'
     if is_financial:
         for sector, keywords in financial_sectors.items():
             if any(kw in text for kw in keywords):
                 financial_sector = sector
                 break
-    
-    # 4. Target Entity (Banking Name) Extraction
-    target_entity = "Unknown Institution"
+
+    target_entity = 'Unknown Institution'
     banks = [
         "RBI", "SBI", "PNB", "Bank of Baroda", "Canara Bank", "Union Bank", "Indian Bank",
         "Bank of India", "Central Bank of India", "Indian Overseas Bank",
@@ -95,72 +255,50 @@ def classify_attack(title: str, description: str) -> dict:
         if bank.lower() in text:
             target_entity = bank
             break
-            
-    # 5. Severity Scoring
-    severity = "Low"
-    critical_keywords = ["critical", "zero-day", "exploit", "rce", "remote code execution", "active exploitation"]
-    high_keywords = ["high", "ransomware", "major breach", "government", "military", "critical infrastructure"]
-    medium_keywords = ["medium", "warning", "vulnerability", "risk", "leak"]
-    
-    if any(kw in text for kw in critical_keywords):
-        severity = "Critical"
-    elif any(kw in text for kw in high_keywords):
-        severity = "High"
-    elif any(kw in text for kw in medium_keywords):
-        severity = "Medium"
 
-    # 6. Threat Level
-    threat_level = "Information"
-    if severity in ["Critical", "High"]:
-        threat_level = "Immediate"
-    elif severity == "Medium":
-        threat_level = "Warning"
+    severity = 'Low'
+    if any(kw in text for kw in ['critical', 'zero-day', 'exploit', 'rce', 'remote code execution', 'active exploitation']):
+        severity = 'Critical'
+    elif any(kw in text for kw in ['high', 'ransomware', 'major breach', 'government', 'military', 'critical infrastructure']):
+        severity = 'High'
+    elif any(kw in text for kw in ['medium', 'warning', 'vulnerability', 'risk', 'leak']):
+        severity = 'Medium'
 
-    # 7. Impact Summary Generation
-    impact_summary = "Reviewing technical impact of the detected activity."
+    threat_level = 'Information'
+    if severity in ['Critical', 'High']:
+        threat_level = 'Immediate'
+    elif severity == 'Medium':
+        threat_level = 'Warning'
+
+    impact_summary = 'Reviewing technical impact of the detected activity.'
     if is_financial:
-        impact_summary = f"Potential financial risk identified targeting {target_entity or 'regional assets'}."
-    elif attack_type == "Ransomware":
-        impact_summary = "Critical availability risk due to unauthorized data encryption."
-    elif attack_type == "Data Breach":
-        impact_summary = "Confidentiality risk involving exposed sensitive data."
+        impact_summary = f'Potential financial risk identified targeting {target_entity or "regional assets"}.'
+    elif attack_type == 'Ransomware':
+        impact_summary = 'Critical availability risk due to unauthorized data encryption.'
+    elif attack_type == 'Data Breach':
+        impact_summary = 'Confidentiality risk involving exposed sensitive data.'
 
-    # 8. Description Preparation (Standard Heuristic)
-    clean_desc = (description or "").strip()
+    clean_desc = (description or '').strip()
     if clean_desc:
         sentences = re.split(r'(?<=[.!?]) +', clean_desc)
-        heuristic_summary = " ".join(sentences[:2])
+        heuristic_summary = ' '.join(sentences[:2])
     else:
         heuristic_summary = title
 
-    # 9. Report AI Enhancement (Professional Brief)
-    ai_summary = ""
-    try:
-        # Clean input before sending to AI
-        safe_desc = clean_html(description or "")
-        
-        prompt = f"""
-        Analyze this cyber incident:
-        Title: {title}
-        Raw Text: {safe_desc}
-        
-        Write a professional, 2-sentence "Executive Intelligence Brief" for a CISO. 
-        Focus on facts, technical exposure, and immediate relevance.
-        
-        Return ONLY the 2 sentences. No intro. No markdown.
-        """
-        response = requests.post(OLLAMA_API_URL, json={
-            'model': 'gemma:2b',
-            'prompt': prompt,
-            'stream': False
-        }, timeout=300)
-        
-        if response.status_code == 200:
-            ai_summary = clean_html(response.json().get('response', '').strip())
-    except requests.exceptions.Timeout:
-        ai_summary = "AI Summarization timed out. Falling back to heuristic brief."
-    except Exception:
-        ai_summary = "AI Summarization unavailable. Falling back to heuristic brief."
+    # AI Enhancement with simpler prompt for 2B models
+    ai_summary = ''
+    safe_desc = clean_html(description or '')
+    prompt = (
+        f'Analyze this cyber incident in 2 short sentences for a CISO:\n'
+        f'Title: {title}\n'
+        f'Details: {safe_desc[:600]}\n'
+        f'Focus on facts, exposure, and immediate relevance.'
+    )
+    resp = call_ollama(prompt, timeout=60, format_json=False, max_retries=1)
+    if not resp.startswith('ERROR:'):
+        ai_summary = clean_html(resp)
+    else:
+        ai_summary = f'AI brief unavailable ({resp}). Using heuristic summary.'
 
     return {
         "description": heuristic_summary,
@@ -175,352 +313,272 @@ def classify_attack(title: str, description: str) -> dict:
         "impact_summary": impact_summary
     }
 
-def analyze_deep_impact(title: str, description: str, raw_data: dict = None, crawled_content: str = "") -> dict:
-    """
-    Forensic Deep-Dive Analysis:
-    Uses Report AI to generate a professional breach timeline and CSO report.
-    """
-    import json
-    raw_data_str = json.dumps(raw_data, indent=2) if raw_data else "No raw JSON data available."
-    
-    # Clean content to reduce token count and noise
-    crawled_content = clean_html(crawled_content)
-    
-    prompt = f"""
-    You are a Senior Cyber Security Officer (CSO) analyzing a security incident.
-    Incident: {title}
-    
-    RAW DATA (JSON) & CONTEXT:
-    {raw_data_str}
-    {clean_html(description)}
 
-    TASK:
-    Provide a forensic deep-dive in JSON format with exactly these 14 keys:
-    1. "incident_title": A formal, concise title for the incident.
-    2. "root_cause": The primary vulnerability or failure that caused this.
-    3. "business_impact": How this affects business continuity and operations.
-    4. "operational_impact": Technical disruption to systems and services.
-    5. "financial_impact": Estimated financial losses or costs.
-    6. "reputational_impact": Potential damage to brand trust.
-    7. "data_involved": Types of data exposed or compromised.
-    8. "data_classification": The classification level of the data (e.g., PII, Financial).
-    9. "attack_type": The category of attack (e.g., Ransomware, Phishing).
-    10. "breach_method": The specific vector or technique used.
-    11. "breach_process": A 3-step technical timeline of how the breach likely occurred.
-    12. "affected_customers": An estimation of who and what volume of customers/entities are impacted.
-    13. "technical_analysis": A paragraph explaining the vulnerability exploited.
-    14. "official_report": An authoritative professional Cyber Security Report for stakeholders.
+# ============================================================================
+# IMPROVED: analyze_deep_impact (template-filling approach)
+# ============================================================================
 
-    Return ONLY the JSON. No markdown. No intro.
+def analyze_deep_impact(title: str, description: str, raw_data: dict = None, crawled_content: str = '') -> dict:
     """
-    
-    try:
-        response = requests.post(OLLAMA_API_URL, json={
-            'model': 'gemma:2b',
-            'prompt': prompt,
-            'stream': False,
-            'format': 'json'
-        }, timeout=600) # Increased timeout to 600s (10 min) because deep analysis takes a long time
-        
-        if response.status_code == 200:
-            raw_response = response.json().get('response', '{}').strip()
-            # Handle potential markdown wrapping from Gemma
-            if raw_response.startswith('```json'):
-                raw_response = raw_response[7:]
-            if raw_response.startswith('```'):
-                raw_response = raw_response[3:]
-            if raw_response.endswith('```'):
-                raw_response = raw_response[:-3]
-            
-            data = json.loads(raw_response.strip())
-            
-            def _stringify(val):
-                if isinstance(val, (dict, list)):
-                    import json
-                    return json.dumps(val, indent=2)
-                return str(val) if val is not None else "N/A"
-                
-            return {
-                "incident_title": _stringify(data.get("incident_title", "Unknown Title")),
-                "root_cause": _stringify(data.get("root_cause", "Analysis pending.")),
-                "business_impact": _stringify(data.get("business_impact", "Impact assessing.")),
-                "operational_impact": _stringify(data.get("operational_impact", "Impact assessing.")),
-                "financial_impact": _stringify(data.get("financial_impact", "Unknown.")),
-                "reputational_impact": _stringify(data.get("reputational_impact", "Unknown.")),
-                "data_involved": _stringify(data.get("data_involved", "Unknown data.")),
-                "data_classification": _stringify(data.get("data_classification", "Unclassified.")),
-                "attack_type": _stringify(data.get("attack_type", "Unknown.")),
-                "breach_method": _stringify(data.get("breach_method", "Unknown.")),
-                "breach_process": _stringify(data.get("breach_process", "Analysis pending forensic recovery.")),
-                "affected_customers": _stringify(data.get("affected_customers", "Quantification in progress.")),
-                "technical_analysis": _stringify(data.get("technical_analysis", "Reviewing technical vectors.")),
-                "official_report": _stringify(data.get("official_report", "Official report being drafted by the SOC team.")),
-                "_debug_prompt": prompt
-            }
-    except requests.exceptions.Timeout:
-        print(f"Analysis Timeout: Ollama took longer than 600 seconds for Deep-Dive")
-        return {
-            "incident_title": title,
-            "root_cause": "N/A",
-            "business_impact": "N/A",
-            "operational_impact": "N/A",
-            "financial_impact": "N/A",
-            "reputational_impact": "N/A",
-            "data_involved": "N/A",
-            "data_classification": "N/A",
-            "attack_type": "N/A",
-            "breach_method": "N/A",
-            "breach_process": "Analysis timed out. Please retry or check Ollama performance.",
-            "affected_customers": "N/A",
-            "technical_analysis": "N/A",
-            "official_report": "Forensic analysis timed out after 10 minutes. This usually happens when the local model is under heavy load or the input context is too large.",
-            "_debug_prompt": prompt
-        }
-    except Exception as e:
-        print(f"Analysis Error: {e}")
-    
-    return {
+    Forensic Deep-Dive using TEMPLATE FILLING — optimized for small local LLMs.
+    If Gemma fails, returns a rich heuristic baseline instead of N/A.
+    """
+    # 1. Build heuristic baseline so we NEVER return empty N/A
+    heuristic = classify_attack(title, description)
+
+    raw_data_str = summarize_raw_data(raw_data, max_chars=1200)
+    description_text = truncate_text(clean_html(description or ''), max_chars=600)
+    crawled_content = truncate_text(clean_html(crawled_content), max_chars=1200)
+
+    # 2. Pre-filled template (small models handle "editing" better than "creating")
+    template = {
         "incident_title": title,
-        "root_cause": "N/A",
-        "business_impact": "N/A",
-        "operational_impact": "N/A",
-        "financial_impact": "N/A",
-        "reputational_impact": "N/A",
-        "data_involved": "N/A",
-        "data_classification": "N/A",
-        "attack_type": "N/A",
-        "breach_method": "N/A",
-        "breach_process": "Analysis timed out. Please retry or check Ollama performance.",
-        "affected_customers": "Impacted entities unknown.",
-        "technical_analysis": "Technical analysis unavailable.",
-        "official_report": "Forensic analysis timed out after 10 minutes. This usually happens when the local model is under heavy load or the input context is too large."
+        "root_cause": f'Under investigation. Likely {heuristic["attack_type"]} vector.',
+        "business_impact": f'Operational disruption possible. Severity: {heuristic["severity"]}.',
+        "operational_impact": f'Systems may be compromised via {heuristic["attack_type"]}.',
+        "financial_impact": f'Quantification pending. Sector: {heuristic["financial_sector"]}.',
+        "reputational_impact": 'Brand trust impact under assessment.',
+        "data_involved": 'Investigating data classifications affected.',
+        "data_classification": 'Pending forensic review.',
+        "attack_type": heuristic['attack_type'],
+        "breach_method": 'Technical analysis in progress.',
+        "breach_process": [
+            'Initial intrusion vector detected.',
+            'Lateral movement under investigation.',
+            'Containment measures activated.'
+        ],
+        "affected_customers": 'Scope assessment ongoing.',
+        "technical_analysis": f'Reviewing {heuristic["attack_type"]} indicators and vulnerability exploitation.',
+        "official_report": heuristic['impact_summary']
+    }
+    template_json = json.dumps(template, indent=2)
+
+    prompt = f"""You are a cybersecurity analyst. Fill in the JSON template below using the incident details.
+STRICT RULES:
+- Output ONLY valid JSON. No markdown. No explanations.
+- Keep the exact keys. Only replace the placeholder values.
+- Be concise: 1-2 sentences per field. Lists must remain JSON arrays.
+- If unsure, keep the original placeholder value.
+
+INCIDENT: {title}
+
+DESCRIPTION:
+{description_text}
+
+RAW DATA:
+{raw_data_str}
+
+ADDITIONAL CONTEXT:
+{crawled_content}
+
+TEMPLATE TO FILL:
+{template_json}
+
+OUTPUT:"""
+
+    response_text = call_ollama(prompt, timeout=180, format_json=True, max_retries=2)
+
+    result = dict(template)  # Start with heuristic baseline
+    result['_generation_error'] = None
+    result['_debug_prompt'] = prompt
+
+    if response_text.startswith('ERROR:'):
+        result['_generation_error'] = response_text
+        result['official_report'] = (
+            f'Heuristic Report (AI unavailable): {heuristic["impact_summary"]} '
+            f'| Target: {heuristic["target_entity"]} | Severity: {heuristic["severity"]}.'
+        )
+    else:
+        parsed = robust_json_extract(response_text)
+        if parsed and isinstance(parsed, dict):
+            # Merge AI output over heuristic baseline (AI overrides)
+            for k, v in parsed.items():
+                if k in template:
+                    result[k] = v
+            result['_generation_error'] = None
+        else:
+            result['_generation_error'] = f'JSON parse failed. Raw: {response_text[:300]}'
+            result['official_report'] = (
+                f'Heuristic Report (AI parse failed): {heuristic["impact_summary"]} '
+                f'| Target: {heuristic["target_entity"]} | Severity: {heuristic["severity"]}.'
+            )
+
+    def _stringify(val):
+        if isinstance(val, (dict, list)):
+            return json.dumps(val, indent=2)
+        return str(val) if val is not None else 'N/A'
+
+    return {
+        "incident_title": _stringify(result.get('incident_title', title)),
+        "root_cause": _stringify(result.get('root_cause', 'Analysis pending.')),
+        "business_impact": _stringify(result.get('business_impact', 'Impact assessing.')),
+        "operational_impact": _stringify(result.get('operational_impact', 'Impact assessing.')),
+        "financial_impact": _stringify(result.get('financial_impact', 'Unknown.')),
+        "reputational_impact": _stringify(result.get('reputational_impact', 'Unknown.')),
+        "data_involved": _stringify(result.get('data_involved', 'Unknown data.')),
+        "data_classification": _stringify(result.get('data_classification', 'Unclassified.')),
+        "attack_type": _stringify(result.get('attack_type', 'Unknown.')),
+        "breach_method": _stringify(result.get('breach_method', 'Unknown.')),
+        "breach_process": _stringify(result.get('breach_process', 'Analysis pending forensic recovery.')),
+        "affected_customers": _stringify(result.get('affected_customers', 'Quantification in progress.')),
+        "technical_analysis": _stringify(result.get('technical_analysis', 'Reviewing technical vectors.')),
+        "official_report": _stringify(result.get('official_report', 'Official report being drafted by the SOC team.')),
+        "_debug_prompt": result['_debug_prompt'],
+        "_generation_error": result['_generation_error']
     }
 
+
+# ============================================================================
+# IMPROVED: analyze_mitre_ttp (template array + smaller prompt)
+# ============================================================================
+
+def analyze_mitre_ttp(title: str, description: str) -> list:
+    prompt = f"""You are a CTI analyst. Map this incident to 1-3 MITRE ATT&CK techniques.
+Output ONLY a JSON array. No markdown. No explanations.
+
+Incident: {title}
+Details: {clean_html(description or '')[:800]}
+
+Template to fill:
+[
+  {{"tactic": "...", "technique_id": "...", "technique_name": "...", "confidence": 85, "analysis_justification": "..."}}
+]
+
+OUTPUT:"""
+
+    resp = call_ollama(prompt, timeout=120, format_json=True, max_retries=2)
+    if resp.startswith('ERROR:'):
+        return []
+
+    parsed = robust_json_extract(resp)
+    if isinstance(parsed, list):
+        return parsed
+    if isinstance(parsed, dict):
+        return [parsed]
+    return []
+
+
+# ============================================================================
+# IMPROVED: analyze_full_incident (structured outline for 2B models)
+# ============================================================================
+
+def analyze_full_incident(title: str, description: str, raw_data: dict, crawled_content: str = '') -> str:
+    raw_data_str = summarize_raw_data(raw_data, max_chars=1200)
+    description_text = truncate_text(clean_html(description or ''), max_chars=800)
+    crawled_content = truncate_text(clean_html(crawled_content), max_chars=1200)
+
+    prompt = f"""You are a Senior Cyber Forensic Analyst. Write a detailed incident report.
+Follow this exact outline. Write 2-4 sentences per section.
+
+INCIDENT: {title}
+DESCRIPTION: {description_text}
+RAW DATA: {raw_data_str}
+CONTEXT: {crawled_content}
+
+OUTLINE:
+1. EXECUTIVE SUMMARY: High-level overview.
+2. TECHNICAL ANALYSIS: Attack vector and IOCs.
+3. TTPs: Likely MITRE techniques and threat actor behavior.
+4. DATA & ASSET IMPACT: Affected systems and data types.
+5. STRATEGIC REMEDIATION: Immediate and long-term fixes.
+
+Write in professional tone. Return ONLY the report text. No markdown headings if possible, use numbered sections.
+
+REPORT:"""
+
+    resp = call_ollama(prompt, timeout=180, format_json=False, max_retries=2)
+    if not resp.startswith('ERROR:'):
+        return resp
+
+    # Fallback: return structured heuristic summary
+    h = classify_attack(title, description)
+    return (
+        f'1. EXECUTIVE SUMMARY: Incident "{title}" classified as {h["attack_type"]} '
+        f'with {h["severity"]} severity targeting {h["target_entity"]}.\n'
+        f'2. TECHNICAL ANALYSIS: {h["impact_summary"]}\n'
+        f'3. TTPs: Standard {h["attack_type"]} techniques suspected.\n'
+        f'4. DATA & ASSET IMPACT: Financial sector involvement: {h["financial_sector"]}.\n'
+        f'5. STRATEGIC REMEDIATION: Isolate affected systems, review logs, patch vulnerabilities.\n\n'
+        f'[AI generation failed: {resp}]'
+    )
+
+
+# ============================================================================
+# IMPROVED: analyze_cve (simpler prompt + fallback)
+# ============================================================================
+
+def analyze_cve(description: str) -> dict:
+    prompt = f"""Extract structured info from this CVE. Output ONLY JSON. No markdown.
+
+Format:
+{{"company_name": "...", "product_name": "...", "vulnerability_type": "...", "summary": "...", "tags": ["..."]}}
+
+CVE: {clean_html(description)[:1000]}
+
+OUTPUT:"""
+
+    resp = call_ollama(prompt, timeout=90, format_json=True, max_retries=1)
+    if resp.startswith('ERROR:'):
+        return None
+
+    parsed = robust_json_extract(resp)
+    if isinstance(parsed, dict) and 'company_name' in parsed:
+        return parsed
+    return None
+
+
+# ============================================================================
+# LEGACY / COMPATIBILITY WRAPPERS
+# ============================================================================
+
 def check_heuristic_match(title: str, description: str, affected_products: list, tech_stack: list) -> str:
-    """
-    Deterministic Header Match Engine:
-    Checks for exact string matches between inventory keywords and threat headers.
-    """
     title_lower = title.lower()
-    desc_lower = (description or "").lower()
-    
-    # Handle both string and dict formats for tech_stack
+    desc_lower = (description or '').lower()
     tech_names = []
     for t in tech_stack:
         if isinstance(t, dict) and 'name' in t:
             tech_names.append(t['name'])
         elif isinstance(t, str):
             tech_names.append(t)
-            
     tech_stack_lower = [t.lower() for t in tech_names]
     products_lower = [p.lower() for p in (affected_products or [])]
-    
+
     for tech in tech_stack_lower:
-        # 1. Exact Match in Title/Header
         if tech in title_lower:
             return tech
-        # 2. Exact Match in Affected Products (for CVEs)
         for product in products_lower:
             if tech in product:
                 return tech
-        # 3. Description check (optional, but keep it strict for 'Header' part as per user request)
-        # We only check title/products for "Heuristic Header Match"
-                
     return None
+
 
 def analyze_dynamic_impact(title: str, description: str, profile: dict, engine: str = 'all') -> dict:
-    """
-    Unified Heuristic Engine v5.0 (Version-Aware):
-    Single pass: exact string match + version range/wildcard/operator comparison.
-    No AI engine. Pure deterministic scanning.
-    """
     from version_engine import scan_threat_version_aware
-    
-    tech_stack = profile.get("tech_stack", [])
-    industry = profile.get("industry", "Technology")
-    
+    tech_stack = profile.get('tech_stack', [])
+    industry = profile.get('industry', 'Technology')
     result = scan_threat_version_aware(
-        title=title,
-        description=description or "",
-        affected_products=[],
-        tech_stack=tech_stack,
-        industry=industry
+        title=title, description=description or '',
+        affected_products=[], tech_stack=tech_stack, industry=industry
     )
-    
     return {
-        "status": result["status"],
-        "score": result["score"],
-        "reason": result["reason"],
-        "method": result["method"]
+        'status': result['status'],
+        'score': result['score'],
+        'reason': result['reason'],
+        'method': result['method']
     }
+
 
 def analyze_cve_impact(cve_id: str, description: str, affected_products: list, profile: dict, engine: str = 'all') -> dict:
-    """
-    CVE Heuristic Engine v5.0 (Version-Aware):
-    Single pass: exact string match + version range/wildcard/operator comparison.
-    No AI engine. Pure deterministic scanning.
-    """
     from version_engine import scan_threat_version_aware
-    
-    tech_stack = profile.get("tech_stack", [])
-    industry = profile.get("industry", "Technology")
-    
+    tech_stack = profile.get('tech_stack', [])
+    industry = profile.get('industry', 'Technology')
     result = scan_threat_version_aware(
-        title=f"CVE Vulnerability: {cve_id}",
-        description=description or "",
-        affected_products=affected_products or [],
-        tech_stack=tech_stack,
-        industry=industry
+        title=f'CVE Vulnerability: {cve_id}', description=description or '',
+        affected_products=affected_products or [], tech_stack=tech_stack, industry=industry
     )
-    
     return {
-        "status": result["status"],
-        "score": result["score"],
-        "reason": result["reason"],
-        "method": result["method"]
+        'status': result['status'],
+        'score': result['score'],
+        'reason': result['reason'],
+        'method': result['method']
     }
-
-def analyze_mitre_ttp(title: str, description: str) -> list:
-    """
-    Report AI: MITRE ATT&CK Mapping Engine.
-    Maps an incident to specific MITRE tactics and techniques.
-    """
-    prompt = f"""
-    You are a Cyber Threat Intelligence (CTI) analyst specialized in the MITRE ATT&CK framework.
-    Analyze the following incident and extract 1-3 most relevant MITRE techniques.
-    
-    Incident: {title}
-    Details: {description}
-    
-    CRITICAL: You must return a valid JSON array of objects.
-    Each object MUST have exactly these 5 keys:
-    1. "tactic": The MITRE Tactic (e.g., Initial Access, Execution, Persistence, Command and Control)
-    2. "technique_id": The Technique ID (e.g., T1566, T1059, T1190)
-    3. "technique_name": The official Technique Name
-    4. "confidence": A number from 0 to 100
-    5. "analysis_justification": 1-sentence reasoning.
-
-    Example Output Format:
-    [
-      {{"tactic": "Initial Access", "technique_id": "T1566", "technique_name": "Phishing", "confidence": 90, "analysis_justification": "Incident involves credential harvesting via deceptive emails."}}
-    ]
-
-    Return ONLY the JSON array. Do not include any explanation or markdown.
-    """
-    
-    try:
-        response = requests.post(OLLAMA_API_URL, json={
-            'model': 'gemma:2b',
-            'prompt': prompt,
-            'stream': False,
-            'format': 'json'
-        }, timeout=600) # Increased to 600s (10 min)
-        
-        if response.status_code == 200:
-            raw_response = response.json().get('response', '[]').strip()
-            # Handle markdown
-            if raw_response.startswith('```json'):
-                raw_response = raw_response[7:]
-            if raw_response.startswith('```'):
-                raw_response = raw_response[3:]
-            if raw_response.endswith('```'):
-                raw_response = raw_response[:-3]
-                
-            data = json.loads(raw_response.strip())
-            if isinstance(data, list):
-                return data
-            elif isinstance(data, dict):
-                return [data]
-    except Exception as e:
-        print(f"MITRE Analysis Error: {e}")
-        
-    return []
-
-def analyze_full_incident(title: str, description: str, raw_data: dict, crawled_content: str = "") -> str:
-    """
-    Report AI: Generates a 500+ word detailed forensic analysis of the incident.
-    """
-    prompt = f"""
-    You are a Senior Cyber Forensic Analyst. Analyze the following cyber incident in extreme detail.
-    
-    Incident Title: {title}
-    
-    CONTEXT DATA:
-    {json.dumps(raw_data, indent=1)}
-    {crawled_content}
-    
-    TASK:
-    Write a comprehensive forensic analysis report (minimum 500 words). 
-    The report MUST cover:
-    1. EXECUTIVE SUMMARY: High-level overview of the incident.
-    2. TECHNICAL ANALYSIS: Deep dive into the vulnerability, attack vector, and indicators of compromise (IOCs).
-    3. TACTICS, TECHNIQUES & PROCEDURES (TTPs): Mapping to MITRE ATT&CK and likely threat actor behavior.
-    4. DATA & ASSET IMPACT: Detailed assessment of affected systems and data classifications.
-    5. STRATEGIC REMEDIATION: Immediate, short-term, and long-term security recommendations.
-    
-    Write in a professional, authoritative tone suitable for a CISO/CTO briefing.
-    Base your detailed analysis primarily on the CONTEXT DATA.
-    
-    Return ONLY the text of the report.
-    """
-    
-    try:
-        # Clean inputs
-        crawled_content = clean_html(crawled_content)
-        
-        response = requests.post(OLLAMA_API_URL, json={
-            'model': 'gemma:2b',
-            'prompt': prompt,
-            'stream': False
-        }, timeout=900) # Increased to 900s (15 min) for 500-word report
-        
-        if response.status_code == 200:
-            return response.json().get('response', '').strip()
-    except Exception as e:
-        print(f"Full Analysis Error: {e}")
-        
-    return "Forensic analysis timed out after 10 minutes. This usually happens when the local model is under heavy load or the input context is too large."
-def analyze_cve(description: str) -> dict:
-    """
-    Uses Gemma to extract structured security intelligence from a CVE description.
-    """
-    prompt = f"""
-    You are a cybersecurity AI parser.
-    Extract structured information from this CVE description.
-    
-    Return ONLY valid JSON. No markdown. No intro.
-    
-    Format:
-    {{
-      "company_name": "Extracted Vendor Name",
-      "product_name": "Extracted Product Name",
-      "vulnerability_type": "e.g., RCE, SQLi, XSS",
-      "summary": "1-sentence technical summary",
-      "tags": ["Tag1", "Tag2"]
-    }}
-    
-    CVE Description:
-    {description}
-    """
-    
-    try:
-        # Check Ollama
-        try:
-            requests.get(f'{OLLAMA_BASE_URL}/api/tags', timeout=5)
-        except:
-            return None
-
-        response = requests.post(OLLAMA_API_URL, json={
-            'model': 'gemma:2b',
-            'prompt': prompt,
-            'stream': False,
-            'format': 'json'
-        }, timeout=300)
-        
-        if response.status_code == 200:
-            data_str = response.json().get('response', '').strip()
-            data = json.loads(data_str)
-            return data
-    except Exception as e:
-        print(f"CVE AI Extraction Error: {e}")
-    return None

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Activity, Info, ExternalLink, Terminal, RefreshCw } from 'lucide-react';
+import { X, Info, ExternalLink, Terminal, RefreshCw } from 'lucide-react';
 
 const RawIntelligenceModal = ({ incident, onClose, theme, onRefresh }) => {
   const [recrawlLoading, setRecrawlLoading] = React.useState(false);
@@ -25,7 +25,7 @@ const RawIntelligenceModal = ({ incident, onClose, theme, onRefresh }) => {
         <div className="modal-header">
           <div>
             <div style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '1px' }}>
-              Intelligence Deep-Dive
+              Intelligence Details
             </div>
             <h2 style={{ fontSize: '20px', fontWeight: 900, margin: 0, color: 'var(--text-main)' }}>{incident.title}</h2>
           </div>
@@ -34,30 +34,6 @@ const RawIntelligenceModal = ({ incident, onClose, theme, onRefresh }) => {
           </button>
         </div>
         <div className="modal-body">
-          <div className="raw-data-section">
-            <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={14} color="#a855f7" /> AI Forensic Analysis (Deep-Dive)</h4>
-            <div style={{
-              background: 'rgba(168, 85, 247, 0.05)',
-              padding: '24px',
-              borderRadius: '12px',
-              marginBottom: '24px',
-              border: '1px solid rgba(168, 85, 247, 0.2)',
-              fontSize: '14px',
-              lineHeight: '1.8',
-              color: 'var(--text-main)',
-              whiteSpace: 'pre-wrap'
-            }}>
-              {incident.full_analysis ? (
-                incident.full_analysis
-              ) : (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>Detailed 500+ word forensic analysis is being generated in the background...</p>
-                  <RefreshCw size={24} className="animate-spin" style={{ color: '#a855f7' }} />
-                </div>
-              )}
-            </div>
-          </div>
-
           <div className="raw-data-section">
             <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Info size={14} /> Intelligence Summary</h4>
             <div style={{ background: 'rgba(255,255,255,0.03)', padding: '20px', borderRadius: '12px', marginBottom: '24px', border: '1px solid var(--border)' }}>
@@ -112,7 +88,7 @@ const RawIntelligenceModal = ({ incident, onClose, theme, onRefresh }) => {
                 <ExternalLink size={16} /> Source Documentation
               </a>
             )}
-            <button className="btn-ghost" onClick={onClose}>Close Forensic View</button>
+            <button className="btn-ghost" onClick={onClose}>Close</button>
           </div>
         </div>
       </div>

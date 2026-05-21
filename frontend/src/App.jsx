@@ -1000,6 +1000,7 @@ function App() {
               activeReport={activeReport}
               setActiveReport={setActiveReport}
               handlePublishReport={handlePublishReport}
+              handleDeleteReport={handleDeleteReport}
             />
           )}
         </main >

@@ -4,7 +4,7 @@ import { Download, FileText } from 'lucide-react';
 const API_BASE = 'http://localhost:8000/api';
 
 const ImpactReports = ({
-  reports, activeReport, setActiveReport, handlePublishReport
+  reports, activeReport, setActiveReport, handlePublishReport, handleDeleteReport
 }) => {
   return (
     <div className="impact-view-container fade-in">
@@ -54,6 +54,7 @@ const ImpactReports = ({
                     PDF EXPORT
                   </button>
                   <button className="btn-primary" style={{ padding: '6px 12px', fontSize: '10px' }} onClick={() => handlePublishReport(activeReport.id)}>PUBLISH</button>
+                  <button className="btn-danger" style={{ padding: '6px 12px', fontSize: '10px' }} onClick={() => handleDeleteReport(activeReport.id)}>DELETE</button>
                 </div>
               </div>
             </div>
