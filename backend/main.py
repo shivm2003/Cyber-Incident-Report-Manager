@@ -1025,6 +1025,7 @@ def analyze_incident_impact(incident_id: int, db: Session = Depends(get_db)):
         attack_type=impact_data.get("attack_type"),
         breach_method=impact_data.get("breach_method"),
         debug_prompt=impact_data.get("_debug_prompt"),
+        debug_response=impact_data.get("_debug_response"),
         published=0
     )
     db.add(report)

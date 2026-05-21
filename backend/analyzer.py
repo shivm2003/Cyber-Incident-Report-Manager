@@ -425,6 +425,7 @@ OUTPUT:"""
         "technical_analysis": _stringify(result.get('technical_analysis', 'Reviewing technical vectors.')),
         "official_report": _stringify(result.get('official_report', 'Official report being drafted by the SOC team.')),
         "_debug_prompt": result['_debug_prompt'],
+        "_debug_response": response_text,
         "_generation_error": result['_generation_error']
     }
 

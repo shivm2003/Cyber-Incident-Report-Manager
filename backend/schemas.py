@@ -57,6 +57,7 @@ class ImpactReportBase(BaseModel):
     attack_type: str | None = None
     breach_method: str | None = None
     _debug_prompt: str | None = None
+    _debug_response: str | None = None
     published: int = 0
 
 class ImpactReport(ImpactReportBase):
@@ -64,6 +65,7 @@ class ImpactReport(ImpactReportBase):
     created_at: datetime
     incident: Incident | None = None
     debug_prompt: str | None = None
+    debug_response: str | None = None
 
     class Config:
         from_attributes = True

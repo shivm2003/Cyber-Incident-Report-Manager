@@ -59,6 +59,7 @@ class ImpactReport(Base):
     attack_type = Column(String, nullable=True)
     breach_method = Column(String, nullable=True)
     debug_prompt = Column(String, nullable=True)
+    debug_response = Column(String, nullable=True)
     
     published = Column(Integer, default=0) # 1 if published, 0 otherwise
     created_at = Column(DateTime, default=datetime.datetime.utcnow)

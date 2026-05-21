@@ -62,6 +62,7 @@ def migrate():
             ("attack_type", "VARCHAR"),
             ("breach_method", "VARCHAR"),
             ("debug_prompt", "VARCHAR"),
+            ("debug_response", "VARCHAR"),
             ("published", "INTEGER DEFAULT 0"),
             ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         ],

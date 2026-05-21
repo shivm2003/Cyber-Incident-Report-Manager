@@ -4,6 +4,53 @@ import { X, ChevronRight, RefreshCw } from 'lucide-react';
 const AIWorkflowModal = ({ data, onClose, theme, model }) => {
   if (!data) return null;
 
+  const getReconstructedResponse = () => {
+    if (data.report?.debug_response) {
+      return data.report.debug_response;
+    }
+    if (data.report) {
+      const {
+        root_cause,
+        business_impact,
+        operational_impact,
+        financial_impact,
+        reputational_impact,
+        data_involved,
+        data_classification,
+        attack_type,
+        breach_method,
+        breach_process,
+        affected_customers,
+        technical_analysis,
+        official_report
+      } = data.report;
+      
+      let bp = breach_process;
+      try {
+        if (typeof breach_process === 'string' && (breach_process.startsWith('[') || breach_process.startsWith('{'))) {
+          bp = JSON.parse(breach_process);
+        }
+      } catch (e) {}
+
+      return JSON.stringify({
+        root_cause,
+        business_impact,
+        operational_impact,
+        financial_impact,
+        reputational_impact,
+        data_involved,
+        data_classification,
+        attack_type,
+        breach_method,
+        breach_process: bp,
+        affected_customers,
+        technical_analysis,
+        official_report
+      }, null, 2);
+    }
+    return null;
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 2000 }}>
       <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{
@@ -60,44 +107,60 @@ const AIWorkflowModal = ({ data, onClose, theme, model }) => {
               <div style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 900 }}>2</div>
               <h3 style={{ margin: 0, fontSize: '15px', color: '#fff' }}>Stage: LLM Reasoning ({model || 'gemma4:e4b'})</h3>
             </div>
-            <div style={{ padding: '20px', background: '#121218', border: '1px solid #1e1e26', borderRadius: '12px', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <p style={{ color: '#888', fontSize: '12px', margin: 0 }}>Executing instruction-tuned forensic prompt...</p>
-                {data.report?._debug_prompt && (
-                  <span style={{ fontSize: '10px', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '4px', fontWeight: 800 }}>RAW PAYLOAD CAPTURED</span>
-                )}
-              </div>
+            <div style={{ padding: '20px', background: '#121218', border: '1px solid #1e1e26', borderRadius: '12px' }}>
+              <p style={{ color: '#888', fontSize: '12px', marginBottom: '15px' }}>Executing instruction-tuned forensic prompt and processing raw response...</p>
               
-              <div style={{
-                background: '#000',
-                padding: '15px',
-                borderRadius: '8px',
-                fontFamily: 'monospace',
-                fontSize: '11px',
-                color: '#10b981',
-                lineHeight: '1.5',
-                border: '1px solid #10b98122',
-                maxHeight: '250px',
-                overflowY: 'auto'
-              }}>
-                <div style={{ color: '#666', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>// TECHNICAL_PAYLOAD_SENT_TO_GEMMA</span>
-                  <span style={{ color: '#444' }}>TOKEN_COUNT: ~{(data.report?._debug_prompt?.length / 4).toFixed(0)}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Input Container */}
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#a855f7', marginBottom: '8px', letterSpacing: '0.5px' }}>
+                    Input:-
+                  </div>
+                  <div style={{
+                    background: '#050508',
+                    padding: '15px',
+                    borderRadius: '8px',
+                    fontFamily: 'monospace',
+                    fontSize: '11px',
+                    color: '#888',
+                    lineHeight: '1.6',
+                    border: '1px solid rgba(168, 85, 247, 0.15)',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    {data.report?.debug_prompt || data.report?._debug_prompt || `Analyze the incident: "${data.incident?.title}" and provide a forensic deep-dive in JSON format...`}
+                  </div>
                 </div>
-                {data.report?._debug_prompt ? (
-                  <div style={{ whiteSpace: 'pre-wrap', color: '#888' }}>
-                    {data.report._debug_prompt}
+
+                {/* Output/Response Container */}
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#10b981', marginBottom: '8px', letterSpacing: '0.5px' }}>
+                    response :-
                   </div>
-                ) : (
-                  <div>"You are a Senior Cyber Forensic Analyst. Analyze the incident: <span style={{ color: '#fff' }}>{data.incident?.title}</span> and provide a forensic deep-dive in JSON format with 14 keys including root_cause, business_impact, and breach_process..."</div>
-                )}
-                
-                {data.status === 'processing' && (
-                  <div style={{ marginTop: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981' }}>
-                    <RefreshCw size={12} className="animate-spin" />
-                    <span>Inference active: Generating structured forensic intelligence...</span>
+                  <div style={{
+                    background: '#050508',
+                    padding: '15px',
+                    borderRadius: '8px',
+                    fontFamily: 'monospace',
+                    fontSize: '11px',
+                    color: '#10b981',
+                    lineHeight: '1.6',
+                    border: '1px solid rgba(16, 185, 129, 0.15)',
+                    maxHeight: '250px',
+                    overflowY: 'auto',
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    {data.status === 'processing' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981' }}>
+                        <RefreshCw size={12} className="animate-spin" />
+                        <span>Inference active: Generating structured forensic intelligence...</span>
+                      </div>
+                    ) : (
+                      getReconstructedResponse() || "No response received yet."
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </div>
