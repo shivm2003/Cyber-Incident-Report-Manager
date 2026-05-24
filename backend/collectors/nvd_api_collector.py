@@ -16,9 +16,12 @@ def process_cve_ai(db: Session, cve_id: int):
     if not cve or cve.ai_processed == 1:
         return
 
-    from analyzer import analyze_cve
-    result = analyze_cve(cve.description)
-
+    # User requested AI Deep Dive Reporting ONLY for crawl data, not NVD API.
+    # We mark it as processed to prevent the auto-retry loop from picking it up.
+    cve.ai_processed = 1
+    db.commit()
+    print(f"[+] AI Enrichment skipped for {cve.cve_id} (Disabled for NVD API)")
+    return
     if result:
         company_name = result.get("company_name", "Unknown Vendor")
         cve.company_name = company_name

@@ -228,6 +228,11 @@ def get_jira_push_history(db: Session = Depends(get_db)):
     history = db.query(models.JiraPushHistory).order_by(models.JiraPushHistory.pushed_at.desc()).limit(100).all()
     return history
 
+@app.get("/api/automation/audit-logs", response_model=List[schemas.AutomationAuditLogResponse])
+def get_automation_audit_logs(db: Session = Depends(get_db)):
+    logs = db.query(models.AutomationAuditLog).order_by(models.AutomationAuditLog.created_at.desc()).limit(100).all()
+    return logs
+
 @app.get("/api/stats")
 def get_stats(db: Session = Depends(get_db)):
     import datetime
@@ -337,14 +342,14 @@ def get_cves(
 
     if sort_by == "version_relevance":
         if sort_order == "desc":
-            query = query.order_by(models.CVE.version_relevance.desc(), models.CVE.published_date.desc())
+            query = query.order_by(models.CVE.version_relevance.desc().nullslast(), models.CVE.published_date.desc().nullslast())
         else:
-            query = query.order_by(models.CVE.version_relevance.asc(), models.CVE.published_date.asc())
+            query = query.order_by(models.CVE.version_relevance.asc().nullsfirst(), models.CVE.published_date.asc().nullsfirst())
     else:
         if sort_order == "desc":
-            query = query.order_by(sort_field.desc())
+            query = query.order_by(sort_field.desc().nullslast())
         else:
-            query = query.order_by(sort_field.asc())
+            query = query.order_by(sort_field.asc().nullsfirst())
 
     total = query.count()
     data = query.offset(skip).limit(limit).all()
@@ -665,6 +670,24 @@ def download_report(format: str, is_india: bool = False, db: Session = Depends(g
         return FileResponse(file_path, filename=f"report.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     
     return {"error": "Invalid format"}
+
+@app.get("/api/cve/by-cve-id/{cve_id_str}/report")
+def get_cve_report_by_name(cve_id_str: str, db: Session = Depends(get_db)):
+    cve = db.query(models.CVE).filter(models.CVE.cve_id == cve_id_str).first()
+    if not cve:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="CVE not found")
+    
+    from reporting import generate_single_cve_pdf
+    import os
+    try:
+        pdf_path = generate_single_cve_pdf(cve)
+        if os.path.exists(pdf_path):
+            return FileResponse(pdf_path, filename=f"{cve_id_str}_Report.pdf", media_type="application/pdf")
+        raise HTTPException(status_code=500, detail="Failed to generate PDF")
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=str(e))
 
 def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 'all'):
     global SCAN_CANCEL_REQUESTED

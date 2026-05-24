@@ -83,6 +83,16 @@ def migrate():
             ("status", "VARCHAR"),
             ("error_message", "VARCHAR"),
             ("pushed_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        ],
+        "automation_audit_logs": [
+            ("entity_type", "VARCHAR"),
+            ("entity_id", "VARCHAR"),
+            ("entity_title", "VARCHAR"),
+            ("scan_status", "VARCHAR"),
+            ("match_status", "VARCHAR"),
+            ("impact_score", "INTEGER"),
+            ("details", "VARCHAR"),
+            ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         ]
     }
     

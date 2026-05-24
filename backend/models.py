@@ -172,3 +172,16 @@ class JiraPushHistory(Base):
     status = Column(String)       # 'success' or 'failed'
     error_message = Column(String, nullable=True)
     pushed_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class AutomationAuditLog(Base):
+    __tablename__ = "automation_audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    entity_type = Column(String) # 'cve' or 'incident'
+    entity_id = Column(String) # CVE ID or Incident ID
+    entity_title = Column(String)
+    scan_status = Column(String) # 'Success', 'Failed'
+    match_status = Column(String) # 'Matched', 'Not Matched'
+    impact_score = Column(Integer, default=0)
+    details = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)

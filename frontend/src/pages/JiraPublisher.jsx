@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, CheckCircle, AlertTriangle, Shield, User, FileText, Activity, RefreshCw, Search, ChevronDown } from 'lucide-react';
+import { Send, CheckCircle, AlertTriangle, Shield, User, FileText, Activity, RefreshCw, Search, ChevronDown, Database, Target, UploadCloud, Rss, Layers, Zap, GitCommit } from 'lucide-react';
 
 const JiraPublisher = () => {
   const [reports, setReports] = useState([]);
@@ -672,6 +672,74 @@ Breach Method: ${report.breach_method || 'N/A'}`;
               <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '12px', lineHeight: '1.4' }}>
                 Instantly crawls NVD and RSS feeds, runs Impact Radar on new threats, generates PDF reports, and pushes to Jira if impact &gt;= 70.
               </p>
+
+              {/* Pipeline Visualization */}
+              <div style={{ marginTop: '25px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '15px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Layers size={14} color="#8b5cf6" /> Execution Pipeline
+                </h4>
+                
+                <div style={{ position: 'relative', paddingLeft: '15px' }}>
+                  {/* Vertical Line */}
+                  <div style={{ position: 'absolute', left: '22px', top: '20px', bottom: '20px', width: '2px', backgroundColor: 'var(--border)' }}></div>
+                  
+                  {/* Phase 1 */}
+                  <div style={{ marginBottom: '20px', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                      <div style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#8b5cf6', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1 }}>
+                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#fff' }}></div>
+                      </div>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Phase 1: NVD Processing</span>
+                    </div>
+                    
+                    <div style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <Database size={12} /> Fetch NVD API data
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <Target size={12} /> Run AI Impact Radar
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <FileText size={12} /> Generate PDF reports
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <GitCommit size={12} /> Check for Duplicacy
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <UploadCloud size={12} color="#10b981" /> Push to Jira
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phase 2 */}
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                      <div style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#f59e0b', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1 }}>
+                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#fff' }}></div>
+                      </div>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Phase 2: Incident Crawling</span>
+                    </div>
+                    
+                    <div style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <Rss size={12} /> Crawl RSS feeds
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <Zap size={12} /> Impact Radar (CVE mapping)
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <Target size={12} /> Deep AI Impact & Mitre
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <GitCommit size={12} /> Check for Duplicacy
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <UploadCloud size={12} color="#10b981" /> Push Incident & PDFs
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -722,14 +790,26 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                           </td>
                           <td style={{ padding: '12px 8px' }}>
                             {history.ticket_key ? (
-                              <a 
-                                href={`https://indiashelter.atlassian.net/browse/${history.ticket_key}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ color: '#6366f1', textDecoration: 'underline', fontWeight: 600 }}
-                              >
-                                {history.ticket_key}
-                              </a>
+                              <div>
+                                <a 
+                                  href={`https://indiashelter.atlassian.net/browse/${history.ticket_key}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: '#6366f1', textDecoration: 'underline', fontWeight: 600, display: 'block' }}
+                                >
+                                  {history.ticket_key}
+                                </a>
+                                {history.entity_type === 'cve' && history.entity_id && (
+                                  <a
+                                    href={`http://localhost:8000/api/cve/by-cve-id/${history.entity_id}/report`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#10b981', fontSize: '11px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', fontWeight: 600 }}
+                                  >
+                                    <FileText size={12} /> View PDF Report
+                                  </a>
+                                )}
+                              </div>
                             ) : (
                               <span style={{ color: 'var(--text-muted)' }}>N/A</span>
                             )}

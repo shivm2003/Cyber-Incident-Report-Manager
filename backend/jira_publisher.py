@@ -130,4 +130,21 @@ def upload_jira_attachments(issue_key: str, files: list) -> dict:
     else:
         return {"success": False, "status_code": response.status_code, "error": response.text}
 
+import models
+from sqlalchemy.orm import Session
+
+def check_existing_ticket(db: Session, entity_type: str, entity_id: str):
+    """
+    Checks if a ticket has already been successfully pushed to JIRA for a given entity.
+    Returns the ticket_key if it exists, otherwise None.
+    """
+    history = db.query(models.JiraPushHistory).filter_by(
+        entity_type=entity_type,
+        entity_id=str(entity_id),
+        status="success"
+    ).first()
+    
+    if history:
+        return history.ticket_key
+    return None
 
