@@ -1193,19 +1193,47 @@ def publish_report_to_jira(
         if res["success"]:
             ticket_key = res["data"]["key"]
             
-            # Process attachments if present
+            import os
+            from reporting import generate_single_cve_pdf, generate_single_impact_pdf
+            
+            files_payload = []
+            
+            # Auto-generate PDF report and add to attachments
+            generated_pdf_path = None
+            try:
+                if str(id).startswith("CVE"):
+                    cve_obj = db.query(models.CVE).filter(models.CVE.cve_id == str(id)).first()
+                    if cve_obj:
+                        generated_pdf_path = generate_single_cve_pdf(cve_obj)
+                elif str(id).isdigit() and str(id) != "0":
+                    impact_rep = db.query(models.ImpactReport).filter(models.ImpactReport.id == int(id)).first()
+                    if impact_rep:
+                        impact_rep.incident = db.query(models.Incident).filter(models.Incident.id == impact_rep.incident_id).first()
+                        mitre_mappings = db.query(models.MitreMapping).filter(models.MitreMapping.incident_id == impact_rep.incident_id).all()
+                        forensic = impact_rep.incident.full_analysis if impact_rep.incident and impact_rep.incident.full_analysis else None
+                        generated_pdf_path = generate_single_impact_pdf(impact_rep, mitre_mappings, forensic_content=forensic)
+                        
+                if generated_pdf_path and os.path.exists(generated_pdf_path):
+                    filename = os.path.basename(generated_pdf_path)
+                    with open(generated_pdf_path, 'rb') as f:
+                        pdf_content = f.read()
+                    files_payload.append(('file', (filename, pdf_content, 'application/pdf')))
+            except Exception as e:
+                print(f"Error generating PDF for Jira: {e}")
+            
+            # Process manual attachments if present
             if attachments:
-                files_payload = []
                 for attach in attachments:
                     if attach.filename:
                         content = attach.file.read()
                         files_payload.append(
                             ('file', (attach.filename, content, attach.content_type))
                         )
-                if files_payload:
-                    upload_res = upload_jira_attachments(ticket_key, files_payload)
-                    if not upload_res["success"]:
-                        entity_type = "cve" if str(id).startswith("CVE") else "incident"
+                        
+            if files_payload:
+                upload_res = upload_jira_attachments(ticket_key, files_payload)
+                if not upload_res["success"]:
+                    entity_type = "cve" if str(id).startswith("CVE") else "incident"
                         push_history = models.JiraPushHistory(
                             entity_type=entity_type,
                             entity_id=str(id),

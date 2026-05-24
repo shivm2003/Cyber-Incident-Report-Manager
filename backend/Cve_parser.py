@@ -102,19 +102,30 @@ class CVEParser:
     
     def get_cvss_score(self) -> Optional[CVSSScore]:
         """Get CVSS vulnerability score"""
-        cna = self.data.get('containers', {}).get('cna', {})
-        metrics = cna.get('metrics', [])
+        containers = self.data.get('containers', {})
+        cna = containers.get('cna', {})
+        metrics = list(cna.get('metrics', []))
+        
+        # If no metrics in CNA, check ADP containers (like CISA-ADP)
+        if not metrics:
+            for adp in containers.get('adp', []):
+                adp_metrics = adp.get('metrics', [])
+                if adp_metrics:
+                    metrics.extend(adp_metrics)
         
         for metric in metrics:
-            if metric.get('format') == 'CVSS':
+            # MITRE v5.2 sometimes puts it directly under cvssV3_1 without format tag
+            cvss_data = metric.get('cvssV3_1', {})
+            if not cvss_data and metric.get('format') == 'CVSS':
                 cvss_data = metric.get('cvssV3_1', {})
-                if cvss_data:
-                    return CVSSScore(
-                        version=cvss_data.get('version', '3.1'),
-                        base_score=cvss_data.get('baseScore', 0.0),
-                        base_severity=cvss_data.get('baseSeverity', 'UNKNOWN'),
-                        vector_string=cvss_data.get('vectorString', 'N/A')
-                    )
+                
+            if cvss_data:
+                return CVSSScore(
+                    version=cvss_data.get('version', '3.1'),
+                    base_score=cvss_data.get('baseScore', 0.0),
+                    base_severity=cvss_data.get('baseSeverity', 'UNKNOWN'),
+                    vector_string=cvss_data.get('vectorString', 'N/A')
+                )
         
         return None
     
