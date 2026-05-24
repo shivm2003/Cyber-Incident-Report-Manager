@@ -144,6 +144,7 @@ class CompanyProfile(Base):
     company_name = Column(String, default="My Company")
     tech_stack = Column(JSON, default=[]) # [{"name": "Java", "version": "11.0.15"}]
     industry = Column(String, default="Finance")
+    auto_retry_start_date = Column(DateTime, default=datetime.datetime(2026, 5, 20))
     last_updated = Column(DateTime, default=datetime.datetime.utcnow)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 

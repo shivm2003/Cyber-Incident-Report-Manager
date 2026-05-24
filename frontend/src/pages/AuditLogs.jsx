@@ -4,9 +4,33 @@ import { Terminal, ShieldCheck, Database, Zap } from 'lucide-react';
 const AuditLogs = ({ auditLogs }) => {
   return (
     <div className="fade-in">
-      <div style={{ marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '8px' }}>Intelligence Audit Log</h2>
-        <p style={{ color: 'var(--text-muted)' }}>Historical trace of automated and manual intelligence synchronization sessions</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+        <div>
+          <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '8px' }}>Intelligence Audit Log</h2>
+          <p style={{ color: 'var(--text-muted)' }}>Historical trace of automated and manual intelligence synchronization sessions</p>
+        </div>
+        <button 
+          onClick={() => window.open('http://127.0.0.1:8000/api/automation/report/latest?timeframe_hours=24', '_blank')}
+          style={{
+            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            color: 'white',
+            border: 'none',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            fontWeight: 800,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+          <Database size={18} />
+          Download Automation Summary (PDF)
+        </button>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

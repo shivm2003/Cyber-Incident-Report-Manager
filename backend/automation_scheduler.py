@@ -35,7 +35,7 @@ def process_cve_automation(db: Session, cve_db_id: int):
 
     print(f"[*] Impact Radar Scan for {cve.cve_id} complete. Score: {res['score']}")
 
-    if res["score"] >= 70:
+    if res["score"] >= 60:
         cve.impact_flag = 1
         cve.review_status = "Pending"
         db.commit()
@@ -52,7 +52,7 @@ def process_cve_automation(db: Session, cve_db_id: int):
                 scan_status="Success",
                 match_status="Matched",
                 impact_score=cve.company_impact_score,
-                details=f"Impact {cve.company_impact_score} >= 70. Skipped pushing to Jira (duplicate)."
+                details=f"Impact {cve.company_impact_score} >= 60. Skipped pushing to Jira (duplicate)."
             )
             db.add(audit)
             db.commit()
@@ -175,7 +175,7 @@ def process_cve_automation(db: Session, cve_db_id: int):
             scan_status="Success",
             match_status="Not Matched",
             impact_score=cve.company_impact_score,
-            details=f"Impact {cve.company_impact_score} < 70."
+            details=f"Impact {cve.company_impact_score} < 60."
         )
         db.add(audit)
         db.commit()
@@ -203,7 +203,7 @@ def process_incident_automation(db: Session, incident_id: int):
     incident.heuristic_match_details = res.get("heuristic_match_details")
     incident.version_relevance = res.get("version_relevance", 0)
     
-    if res["score"] >= 70:
+    if res["score"] >= 60:
         incident.impact_flag = 1
         incident.review_status = "Pending"
         db.commit()
@@ -315,7 +315,7 @@ def process_incident_automation(db: Session, incident_id: int):
                     scan_status="Success",
                     match_status="Matched",
                     impact_score=incident.company_impact_score,
-                    details=f"Impact {incident.company_impact_score} >= 70. Skipped pushing to Jira (duplicate)."
+                    details=f"Impact {incident.company_impact_score} >= 60. Skipped pushing to Jira (duplicate)."
                 )
                 db.add(audit)
                 db.commit()
@@ -438,7 +438,7 @@ def process_incident_automation(db: Session, incident_id: int):
             scan_status="Success",
             match_status="Not Matched",
             impact_score=incident.company_impact_score,
-            details=f"Impact {incident.company_impact_score} < 70."
+            details=f"Impact {incident.company_impact_score} < 60."
         )
         db.add(audit)
         db.commit()
@@ -451,14 +451,17 @@ def run_automation_cycle(timeframe_nvd="today", timeframe_rss="today", run_nvd=T
     print(f"[*] Automation Scheduler running: NVD={run_nvd}({timeframe_nvd}), RSS={run_rss}({timeframe_rss})...")
     db = SessionLocal()
     try:
+        # Fetch dynamic Auto-Retry cutoff date from DB
+        profile = db.query(models.CompanyProfile).first()
+        target_date = profile.auto_retry_start_date if profile and profile.auto_retry_start_date else datetime.datetime(2026, 5, 20)
+        
         # 1. NVD CVE Sync (Done FIRST as requested)
         if run_nvd:
             current_status_message = "Fetching NVD API..."
             nvd_result = fetch_nvd_cves(db, timeframe=timeframe_nvd)
             new_cve_ids = nvd_result.get("new_ids", []) if isinstance(nvd_result, dict) else []
             
-            # Auto-Retry: Find CVEs that were skipped or failed the AI scan (from 2026-05-20 onwards, no limit)
-            target_date = datetime.datetime(2026, 5, 20)
+            # Auto-Retry: Find CVEs that were skipped or failed the AI scan
             missed_cves = db.query(models.CVE).filter(
                 models.CVE.ai_processed == 0,
                 models.CVE.published_date >= target_date
