@@ -1049,7 +1049,7 @@ def analyze_incident_impact(incident_id: int, db: Session = Depends(get_db)):
             print(f"[-] Auto-crawling failed: {e}")
             
     print(f"[*] Sending details to Shivam AI for Deep-Dive Analysis...")
-    print(f"[*] (Please wait, local model generation may take 1-5 minutes)")
+    print(f"[*] (Please wait, local model generation may take 10-15 minutes)")
     from analyzer import analyze_deep_impact
     impact_data = analyze_deep_impact(
         incident.title, 
