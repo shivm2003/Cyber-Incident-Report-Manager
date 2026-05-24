@@ -456,6 +456,20 @@ class JiraPushHistoryResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class AutomationAuditLogResponse(BaseModel):
+    id: int
+    entity_type: str
+    entity_id: str
+    entity_title: str | None = None
+    scan_status: str
+    match_status: str
+    impact_score: int
+    details: str | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class AutomationRunRequest(BaseModel):
     run_nvd: bool = True
     nvd_timeframe: str = "month"
