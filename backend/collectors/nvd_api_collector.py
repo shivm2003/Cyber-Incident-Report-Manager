@@ -17,7 +17,6 @@ def process_cve_ai(db: Session, cve_id: int):
         return
 
     from analyzer import analyze_cve
-    print(f"[*] AI Processing for CVE: {cve.cve_id}...")
     result = analyze_cve(cve.description)
 
     if result:

@@ -835,3 +835,120 @@ def generate_combined_excel(report, incidents, cves, include_crawled_content=Tru
         pd.DataFrame(summary_data).to_excel(writer, sheet_name="Summary", index=False)
 
     return file_path
+
+def generate_single_cve_pdf(cve):
+    """
+    Generates a professional, high-fidelity PDF report for a single CVE vulnerability.
+    """
+    temp_dir = tempfile.gettempdir()
+    file_path = os.path.join(temp_dir, f"CVE_Report_{cve.cve_id.replace('-', '_')}.pdf")
+    
+    doc = SimpleDocTemplate(
+        file_path, 
+        pagesize=letter,
+        rightMargin=50, leftMargin=50,
+        topMargin=70, bottomMargin=50
+    )
+    
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'MainTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor("#0a0e17"),
+        spaceAfter=5
+    )
+    
+    header_style = ParagraphStyle(
+        'SectionHeader',
+        parent=styles['Heading2'],
+        fontSize=12,
+        textColor=colors.HexColor("#1e1b4b"),
+        spaceBefore=15,
+        spaceAfter=8,
+        borderPadding=(0, 0, 2, 0),
+        borderColor=colors.HexColor("#e5e7eb")
+    )
+    
+    body_style = ParagraphStyle(
+        'ReportBody',
+        parent=styles['Normal'],
+        fontSize=9.5,
+        leading=14,
+        spaceAfter=8
+    )
+
+    elements = []
+    
+    # Top Banner
+    banner_text = "<font color='#4f46e5'><b>VULNERABILITY INTELLIGENCE REPORT</b></font> | CVE EXTRACTOR"
+    elements.append(Paragraph(banner_text, ParagraphStyle('Banner', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9, textColor=colors.grey)))
+    elements.append(Spacer(1, 20))
+    
+    # Title
+    elements.append(Paragraph(cve.cve_id, title_style))
+    
+    # Severity & Score Banner
+    sev = (cve.severity or "Unknown").upper()
+    sev_color = "#ef4444" if sev == "CRITICAL" else ("#f59e0b" if sev == "HIGH" else ("#3b82f6" if sev == "MEDIUM" else "#10b981"))
+    
+    elements.append(Paragraph(f"<b>Severity:</b> <font color='{sev_color}'>{sev}</font> | <b>CVSS Score:</b> {cve.cvss_score or 'N/A'}", body_style))
+    elements.append(Spacer(1, 10))
+    
+    # Meta Information Table
+    meta_data = [
+        [Paragraph("<b>AFFECTED VENDOR</b>", body_style), Paragraph(cve.company_name or "Unknown", body_style)],
+        [Paragraph("<b>AFFECTED PRODUCT</b>", body_style), Paragraph(cve.product_name or "Unknown", body_style)],
+        [Paragraph("<b>PULL TYPE</b>", body_style), Paragraph(cve.pull_type or "N/A", body_style)],
+        [Paragraph("<b>PUBLISHED DATE</b>", body_style), Paragraph(cve.published_date.strftime("%Y-%m-%d") if cve.published_date else "Unknown", body_style)],
+        [Paragraph("<b>LAST MODIFIED</b>", body_style), Paragraph(cve.last_modified_date.strftime("%Y-%m-%d") if cve.last_modified_date else "Unknown", body_style)],
+        [Paragraph("<b>RADAR PROXIMITY IMPACT SCORE</b>", body_style), Paragraph(f"<b>{cve.company_impact_score}/100</b>", body_style)]
+    ]
+    t = Table(meta_data, colWidths=[150, 330])
+    t.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e7eb")),
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor("#f9fafb")),
+        ('PADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 15))
+    
+    # Vulnerability Description
+    elements.append(Paragraph("VULNERABILITY DESCRIPTION", header_style))
+    elements.append(Paragraph(cve.description or "No description available.", body_style))
+    elements.append(Spacer(1, 10))
+    
+    # Radar Proximity Reasoning
+    if cve.company_impact_reason:
+        elements.append(Paragraph("RADAR PROXIMITY ASSESSMENT", header_style))
+        elements.append(Paragraph(cve.company_impact_reason, body_style))
+        elements.append(Spacer(1, 10))
+        
+    # AI Intelligence Enrichment
+    if cve.ai_summary:
+        elements.append(Paragraph("AI INTELLIGENCE ENRICHMENT", header_style))
+        elements.append(Paragraph(cve.ai_summary, body_style))
+        if cve.ai_tags:
+            tags_str = ", ".join(cve.ai_tags) if isinstance(cve.ai_tags, list) else str(cve.ai_tags)
+            elements.append(Paragraph(f"<b>AI Tags:</b> {tags_str}", body_style))
+        elements.append(Spacer(1, 10))
+        
+    # Affected Products / CPE List
+    if cve.affected_products:
+        elements.append(Paragraph("AFFECTED CPE CRITERIA (MAX 10)", header_style))
+        cpes = cve.affected_products if isinstance(cve.affected_products, list) else []
+        for cpe in cpes[:10]:
+            elements.append(Paragraph(f"• <font face='Courier' size='8'>{cpe}</font>", body_style))
+        elements.append(Spacer(1, 10))
+        
+    # Reference URLs
+    if cve.references:
+        elements.append(Paragraph("INTEL AND ADVISORY REFERENCES", header_style))
+        refs = cve.references if isinstance(cve.references, list) else []
+        for ref in refs[:5]:
+            elements.append(Paragraph(f"• <a href='{ref}' color='blue'>{ref}</a>", body_style))
+            
+    doc.build(elements, onFirstPage=_draw_report_header_footer, onLaterPages=_draw_report_header_footer)
+    return file_path

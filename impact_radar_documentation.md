@@ -1,71 +1,111 @@
-# Impact Radar System: End-to-End Documentation
+For CVE :-(For Now) Previous saved left and it will applicable for new data . 
+I want to update the the Vulnerability DB (CVE) when the Data automatically Fetched for the NVD API in every 3 hour and also update it and saved to the datebase , after saving the data Impact Radar should be automatically run when any CVE data found company impact Detected then it should be passed with the JIRA Ticket SYstem and Also attachemnts with the CVE Extractor with the JIRA.
 
-The **Impact Radar** is the core proactive threat intelligence component of the Cyber Incident Report Manager. It utilizes a hybrid approach (Deterministic Heuristics + AI/Gemma Mapping) to analyze global threats and pinpoint exactly which ones pose a direct risk to your organization's specific technical footprint and industry.
+I all the details should be passed to the JIRA Ticket and also attachments with the CVE Extractor with the JIRA.
+and saved to the previous pushed to JIRA data, all the data should be shows what i pushed and time to push at all .
+Every time check with the CVE previous report published (Duplicany check should be happen)
 
-This document outlines the entire lifecycle of a threat as it flows through the Impact Radar system.
 
----
+For Incident Command  :-(For Now) Previous saved left and it will applicable for new data .
+For the Intelligence Command feed crawl the data every 3 hour and also update it and saved to the datebase , after saving the data Impact Radar should be automatically run when any incident are impact during the scan , then that should be passed to AI Analysis Impact System for Report , if there is any CVE found then it must be extracted and passed to the CVE Extractor report and incident report should be passed and details should be automatically fill push to JIRA with Attachment and also saved to the DB what Report pushed .
 
-## 1. Tech Stack Inventory Configuration
+Every time check with the CVE previous report and duplicany check for incident published (Duplicany check should be happen)
 
-The foundation of the Impact Radar is your **Company Profile**. For the radar to effectively filter out noise, it needs to know what technologies your organization relies on.
 
-*   **Access:** Navigate to the **Technology Inventory** tab in the dashboard.
-*   **Company Name & Industry:** Sets the broad context. The `Industry` field is particularly critical (e.g., setting this to "Finance" triggers aggressive, industry-specific AI threat flagging).
-*   **Tech Stack:** You can define a comprehensive list of assets, including:
-    *   Operating Systems (e.g., Windows, Linux)
-    *   Frameworks & Languages (e.g., React, Java, Python)
-    *   Infrastructure (e.g., AWS, Azure, Vercel)
-    *   *Note: Version numbers can also be specified for highly targeted CVE matching.*
 
-> [!TIP]
-> **Pro Tip:** Keep your tech stack updated. The more precise your inventory, the higher the confidence of the AI Map engine when scoring threats.
 
----
 
-## 2. Threat Scanning Engines (Dual-Engine Logic)
 
-When a new Cyber Incident or CVE is collected by the system, it is automatically passed through the Impact Radar's dual-engine analysis pipeline.
 
-### A. Heuristic Engine (Deterministic Match)
-The first layer is a lightning-fast deterministic scan.
-*   **Logic:** It performs an exact string match between your `Tech Stack` inventory and the headers/titles of the incoming threat or the "Affected Products" list of a CVE.
-*   **Result:** If a match is found, the threat is instantly flagged with a `score` of 100, a `status` of "Yes", and the `detection_method` is recorded as **Heuristic**.
 
-### B. AI Map Engine (Gemma 2B)
-If the Heuristic engine doesn't find an obvious header match, the system falls back to the deep AI analysis using the local Gemma model.
-*   **Logic:** The AI acts as a Senior Cyber Threat Analyst. It reads the full incident description and cross-references it against your Company Name, Industry, and full Tech Stack context.
-*   **Financial Aggressiveness:** If your industry is set to "Finance", the AI is explicitly instructed to aggressively flag Banking Trojans, Ransomware, and Data Exfiltration campaigns, even if your exact tech stack isn't explicitly named in the breach report.
-*   **Result:** The AI returns a JSON payload containing:
-    *   `status`: "Yes" or "No"
-    *   `score`: 0-100 proximity rating.
-    *   `reason`: A 1-2 sentence contextual explanation of the risk vector.
-    *   `method`: Recorded as **AI Map**.
+# Automated Jira Publishing & Crawling Scheduler Implementation Plan
+
+This plan specifically addresses your requirements for both **CVE Data Automation** and **Incident Command Automation** with a 3-hour polling cycle, robust duplication checking, and complete Jira integration with PDF attachments.
 
 ---
 
-## 3. Global Search and Pagination (Backend Optimization)
+## Proposed Changes
 
-As the database of incidents and CVEs grows, finding specific threats requires robust searching. The system implements a highly optimized **Backend Pagination and Search** architecture.
+### 1. Database Schema Updates
+To track everything pushed to Jira and ensure we display historical data correctly, we will add a new tracking table.
 
-*   **How it Works:** When you use the search bar in the *Threat Command Feed* or *Vulnerability DB*, the request is sent directly to the SQLite backend.
-*   **Search Scope:** The backend performs an `ILIKE` (case-insensitive) search across both the `title` and `description` of the records. 
-*   **Data Delivery:** Instead of sending thousands of records to your browser (which would cause lag), the database calculates the total matching records and sends back exactly the 50 items (or your chosen limit) needed for the current page.
-*   **Interactive Jumping:** You can seamlessly jump between result pages using the numbered pagination UI (e.g., `1 | 2 | 3 | 4`) without losing your search context.
+#### [MODIFY] [models.py](file:///c:/Users/shivam/Desktop/VAPT/Cyber-Incident-Report-Manager/backend/models.py)
+Add the `JiraPushHistory` model to keep track of automatically pushed reports. This handles the "all the data should be shows what i pushed and time to push at all" requirement.
+```python
+class JiraPushHistory(Base):
+    __tablename__ = "jira_push_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    entity_type = Column(String)  # 'cve' or 'incident'
+    entity_id = Column(String)    # CVE-ID or Incident Database ID
+    summary = Column(String)
+    ticket_key = Column(String, nullable=True)
+    status = Column(String)       # 'success' or 'failed'
+    error_message = Column(String, nullable=True)
+    pushed_at = Column(DateTime, default=datetime.datetime.utcnow)
+```
+
+#### [MODIFY] [schemas.py](file:///c:/Users/shivam/Desktop/VAPT/Cyber-Incident-Report-Manager/backend/schemas.py)
+Add the `JiraPushHistoryResponse` Pydantic schema for the frontend.
+
+#### [MODIFY] [migrate.py](file:///c:/Users/shivam/Desktop/VAPT/Cyber-Incident-Report-Manager/backend/migrate.py)
+Add the `jira_push_history` schema to the auto-migration tool.
 
 ---
 
-## 4. Manual Review Queue
+### 2. For CVE (Vulnerability DB)
+- **3-Hour Scheduled Fetch**: The background scheduler will call the NVD API (`fetch_nvd_cves`) every 3 hours.
+- **Duplication Check**: The existing duplication check (`models.CVE.cve_id == cve_id`) ensures previously saved data is ignored and only new data applies. Additionally, we will verify the Jira ticket hasn't already been pushed via the `jira_push_history` table.
+- **Impact Radar Trigger**: For any *newly* inserted CVE, the system will instantly run `analyze_cve_impact`.
+- **Jira Automation**: If company impact is detected (score >= 70):
+  - A PDF will be generated via a new `generate_single_cve_pdf()` function.
+  - A Jira ticket will be created automatically.
+  - The CVE Extractor PDF will be attached to the Jira ticket.
+  - The action will be recorded in the `JiraPushHistory` DB table.
 
-While the AI is powerful, human verification is the final step in the intelligence lifecycle. Threats that are flagged by the engines but require human sign-off are routed to the **Manual Review** queue.
+---
 
-*   **Access:** Navigate to the **Manual Review** tab.
-*   **Pending Items:** You will see a combined list of both Cyber Incidents and CVEs that have a `review_status` of **Pending**.
-*   **Triage Actions:**
-    *   **Approve (True Positive):** Confirms the AI/Heuristic engine was correct. The threat is fully integrated into your verified Impact Reports.
-    *   **Dismiss (False Positive):** Rejects the flag. This helps clean up your dashboard and provides a feedback loop for future tuning.
-*   **Context:** While reviewing, you can click on any incident to open the **Raw Intelligence Modal** and read the full AI-generated executive briefs, MITRE ATT&CK mappings, and forensic deep-dives before making your decision.
+### 3. For Incident Command
+- **3-Hour Intelligence Feed Crawl**: The scheduler will also run `fetch_rss_feeds` every 3 hours.
+- **Duplication Check**: The existing check (URL matching) ensures only new incidents are processed.
+- **Impact Radar Trigger**: The system will automatically run `analyze_dynamic_impact` on new incidents.
+- **Deep-Dive Analysis & CVE Extraction**: If the incident has company impact:
+  - It triggers the AI Analysis Impact System (`analyze_deep_impact`) to build an Incident Impact Report.
+  - The system scans the incident description and crawled article for CVE IDs using regex (`CVE-\d{4}-\d{4,7}`).
+  - Extracted CVEs are validated against the DB (or pulled from NVD API if missing) and passed to the CVE Extractor Report builder.
+- **Jira Automation**:
+  - A Jira ticket is created for the Incident.
+  - **Attachments**: The Incident Impact Report PDF *AND* any extracted CVE Extractor PDFs are uploaded.
+  - The action is recorded in the `JiraPushHistory` DB table.
 
-> [!IMPORTANT]
-> **Workflow Summary:**
-> Update Tech Stack ➔ System Collects Intel ➔ Dual-Engine Scan (Heuristic/AI) ➔ Search & Filter ➔ Manual Review (Approve/Dismiss) ➔ Final Impact Report.
+---
+
+### 4. Scheduler Core & REST Endpoints
+#### [MODIFY] [main.py](file:///c:/Users/shivam/Desktop/VAPT/Cyber-Incident-Report-Manager/backend/main.py)
+1. **FastAPI Background Loop**: An `asyncio.sleep(3 * 3600)` loop that triggers on FastAPI startup event.
+2. **API Routes**:
+   - `GET /api/jira/push-history`: Fetch the ticket publishing history logs to show in the UI.
+   - `POST /api/automation/run`: Manually trigger the crawler, analysis, and Jira push automation instantly (useful for testing without waiting 3 hours).
+   - `GET /api/automation/status`: Show scheduler status.
+
+---
+
+### 5. Frontend UI Updates
+#### [MODIFY] [JiraPublisher.jsx](file:///c:/Users/shivam/Desktop/VAPT/Cyber-Incident-Report-Manager/frontend/src/pages/JiraPublisher.jsx)
+1. Add an "Automation Control Panel" to manually trigger the 3-hour scan cycle for immediate testing.
+2. Fetch and render the Jira push history table at the bottom of the page showing exact timestamps, items pushed, and their success status.
+
+---
+
+## Verification Plan
+
+### Automated/API Verification
+- Verify the new schema table is created by running `python migrate.py`.
+- Call `POST /api/automation/run` manually to trigger feed fetch, impact radar scan, CVE extraction, PDF generation, and JIRA ticket creation.
+- Check the console logs for duplication checks passing correctly.
+- Fetch `GET /api/jira/push-history` to ensure records persist correctly.
+
+### Manual Verification
+- Go to the **Jira Publisher** tab in the browser.
+- Verify the "Push History" component loads with historical records.
+- Click the "Sync & Analyze Now" manual button and verify a JIRA ticket appears in your Atlassian board with the appropriate PDF attachments for both Incidents and CVEs.

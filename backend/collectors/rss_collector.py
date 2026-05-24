@@ -44,6 +44,7 @@ RSS_FEEDS = [
 
 def fetch_rss_feeds(db: Session, timeframe: str = "today"):
     collected_count = 0
+    new_ids = []
     now = datetime.utcnow()
     
     # Calculate threshold date
@@ -97,10 +98,12 @@ def fetch_rss_feeds(db: Session, timeframe: str = "today"):
                         raw_data=dict(entry)
                     )
                     db.add(incident)
+                    db.flush()
+                    new_ids.append(incident.id)
                     collected_count += 1
             db.commit()
         except Exception as e:
             print(f"[!] RSS Error {feed['name']}: {str(e)}")
             
-    return {"message": f"RSS ({timeframe}): {collected_count} new incidents."}
+    return {"message": f"RSS ({timeframe}): {collected_count} new incidents.", "new_ids": new_ids}
 

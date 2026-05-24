@@ -19,6 +19,16 @@ const JiraPublisher = () => {
   const [sourceType, setSourceType] = useState('incident');
   const [reportSearch, setReportSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [pushHistory, setPushHistory] = useState([]);
+  const [automationStatus, setAutomationStatus] = useState({ is_running: false, last_run: 'Never' });
+  const [triggeringAutomation, setTriggeringAutomation] = useState(false);
+  
+  // Automation Config State
+  const [configNvd, setConfigNvd] = useState(true);
+  const [nvdTimeframe, setNvdTimeframe] = useState('month');
+  const [configIncident, setConfigIncident] = useState(true);
+  const [incidentTimeframe, setIncidentTimeframe] = useState('week');
+  
   const dropdownRef = useRef(null);
 
   // Close dropdown on outside click
@@ -56,7 +66,84 @@ const JiraPublisher = () => {
         console.error("Error fetching reports:", err);
         setLoadingReports(false);
       });
+
+    fetchPushHistory();
+    fetchAutomationStatus();
   }, []);
+
+  useEffect(() => {
+    let interval;
+    if (automationStatus.is_running) {
+      // Fast polling when actively triggered manually
+      interval = setInterval(() => {
+        fetchAutomationStatus();
+        fetchPushHistory();
+      }, 1500);
+    } else {
+      // Passive 30-second polling to catch background automated tickets
+      interval = setInterval(() => {
+        fetchAutomationStatus();
+        fetchPushHistory();
+      }, 30000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [automationStatus.is_running]);
+
+  const fetchPushHistory = () => {
+    fetch('http://localhost:8000/api/jira/push-history')
+      .then(res => res.json())
+      .then(data => setPushHistory(data))
+      .catch(err => console.error("Error fetching push history:", err));
+  };
+
+  const fetchAutomationStatus = () => {
+    fetch('http://localhost:8000/api/automation/status')
+      .then(res => res.json())
+      .then(data => setAutomationStatus(data))
+      .catch(err => console.error("Error fetching automation status:", err));
+  };
+
+  const updateInterval = (hours) => {
+    fetch('http://localhost:8000/api/automation/interval', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ interval_hours: parseInt(hours) })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setAutomationStatus(prev => ({...prev, interval_hours: data.interval_hours}));
+      })
+      .catch(err => console.error("Error updating interval:", err));
+  };
+
+  const triggerAutomation = () => {
+    if (!configNvd && !configIncident) {
+      alert("Please select at least one sync source (NVD or Incident).");
+      return;
+    }
+    setTriggeringAutomation(true);
+    fetch('http://localhost:8000/api/automation/run', { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        run_nvd: configNvd,
+        nvd_timeframe: nvdTimeframe,
+        run_incident: configIncident,
+        incident_timeframe: incidentTimeframe
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setAutomationStatus(prev => ({...prev, is_running: true, status_message: 'Starting automation...'}));
+        setTriggeringAutomation(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setTriggeringAutomation(false);
+      });
+  };
 
   const handleReportChange = (reportId) => {
     setSelectedReportId(reportId);
@@ -158,6 +245,7 @@ Breach Method: ${report.breach_method || 'N/A'}`;
       setResult(data);
       if (data.success) {
         setSelectedFiles([]);
+        fetchPushHistory();
       }
     } catch (err) {
       console.error(err);
@@ -485,6 +573,191 @@ Breach Method: ${report.breach_method || 'N/A'}`;
           </div>
         </div>
       </form>
+
+      {/* AUTOMATION CONTROL & PUSH HISTORY SECTION */}
+      <div style={{ marginTop: '40px', paddingBottom: '40px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px', color: 'var(--text-main)' }}>Jira Automation Scheduler & Push History</h2>
+        
+        <div className="rb-grid">
+          <div className="rb-sidebar-col">
+            <div className="rb-config-panel glass-card-v2" style={{ borderTop: '4px solid #8b5cf6' }}>
+              <h3 className="rb-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Activity size={18} color="#8b5cf6" /> Automation Status
+              </h3>
+              
+              <div style={{ marginBottom: '20px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Background Scheduler:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: 'bold', color: '#10b981' }}>ACTIVE</span>
+                    <select 
+                      value={automationStatus.interval_hours || 3}
+                      onChange={(e) => updateInterval(e.target.value)}
+                      style={{ padding: '2px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}
+                    >
+                      <option value={1}>Every 1 Hour</option>
+                      <option value={3}>Every 3 Hours</option>
+                      <option value={6}>Every 6 Hours</option>
+                      <option value={12}>Every 12 Hours</option>
+                      <option value={24}>Every 24 Hours</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Task Status:</span>
+                  <span style={{ fontWeight: 'bold', color: automationStatus.is_running ? '#fbbf24' : 'var(--text-main)' }}>
+                    {automationStatus.status_message || (automationStatus.is_running ? 'Syncing...' : 'Idle')}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Last Automated Run:</span>
+                  <span style={{ fontWeight: 'bold' }}>
+                    {automationStatus.last_run !== 'Never' ? new Date(automationStatus.last_run).toLocaleString() : 'Never'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Automation Config UI */}
+              <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: 'var(--surface-color)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <h4 style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Manual Sync Configuration</h4>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--text-main)' }}>
+                    <input type="checkbox" checked={configNvd} onChange={e => setConfigNvd(e.target.checked)} />
+                    NVD API Sync
+                  </label>
+                  <select 
+                    value={nvdTimeframe} 
+                    onChange={e => setNvdTimeframe(e.target.value)}
+                    disabled={!configNvd}
+                    style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid var(--border)', backgroundColor: configNvd ? 'var(--bg-color)' : 'var(--surface-color)', color: 'var(--text-main)' }}
+                  >
+                    <option value="today">Today</option>
+                    <option value="week">Last 7 Days</option>
+                    <option value="month">Last 30 Days</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--text-main)' }}>
+                    <input type="checkbox" checked={configIncident} onChange={e => setConfigIncident(e.target.checked)} />
+                    Incident Feed Sync
+                  </label>
+                  <select 
+                    value={incidentTimeframe} 
+                    onChange={e => setIncidentTimeframe(e.target.value)}
+                    disabled={!configIncident}
+                    style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid var(--border)', backgroundColor: configIncident ? 'var(--bg-color)' : 'var(--surface-color)', color: 'var(--text-main)' }}
+                  >
+                    <option value="today">Today</option>
+                    <option value="week">Last 7 Days</option>
+                    <option value="month">Last 30 Days</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={triggerAutomation}
+                className="btn-primary"
+                style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '12px' }}
+                disabled={triggeringAutomation || automationStatus.is_running}
+              >
+                {triggeringAutomation || automationStatus.is_running ? (
+                  <RefreshCw className="animate-spin" size={16} />
+                ) : (
+                  <Activity size={16} />
+                )}
+                <span>Sync & Analyze Now</span>
+              </button>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '12px', lineHeight: '1.4' }}>
+                Instantly crawls NVD and RSS feeds, runs Impact Radar on new threats, generates PDF reports, and pushes to Jira if impact &gt;= 70.
+              </p>
+            </div>
+          </div>
+
+          <div className="rb-discovery-col">
+            <div className="rb-discovery-card-v2 glass-card-v2" style={{ height: '100%' }}>
+              <h3 className="rb-panel-title" style={{ marginBottom: '20px' }}>Ticket Publishing History</h3>
+              
+              <div style={{ overflowX: 'auto' }}>
+                <table className="rb-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '12px 8px', fontWeight: 600 }}>Date/Time</th>
+                      <th style={{ padding: '12px 8px', fontWeight: 600 }}>Entity</th>
+                      <th style={{ padding: '12px 8px', fontWeight: 600 }}>Summary</th>
+                      <th style={{ padding: '12px 8px', fontWeight: 600 }}>Ticket</th>
+                      <th style={{ padding: '12px 8px', fontWeight: 600 }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pushHistory.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                          No Jira tickets pushed yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      pushHistory.map(history => (
+                        <tr key={history.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '12px 8px', whiteSpace: 'nowrap' }}>
+                            {new Date(history.pushed_at).toLocaleString()}
+                          </td>
+                          <td style={{ padding: '12px 8px' }}>
+                            <span style={{ 
+                              padding: '2px 6px', 
+                              borderRadius: '4px', 
+                              fontSize: '11px', 
+                              backgroundColor: history.entity_type === 'cve' ? '#fee2e2' : '#e0e7ff',
+                              color: history.entity_type === 'cve' ? '#ef4444' : '#4f46e5',
+                              fontWeight: 'bold',
+                              textTransform: 'uppercase'
+                            }}>
+                              {history.entity_type}
+                            </span>
+                            <div style={{ fontSize: '12px', marginTop: '4px', fontWeight: 600 }}>{history.entity_id}</div>
+                          </td>
+                          <td style={{ padding: '12px 8px', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={history.summary}>
+                            {history.summary}
+                          </td>
+                          <td style={{ padding: '12px 8px' }}>
+                            {history.ticket_key ? (
+                              <a 
+                                href={`https://indiashelter.atlassian.net/browse/${history.ticket_key}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: '#6366f1', textDecoration: 'underline', fontWeight: 600 }}
+                              >
+                                {history.ticket_key}
+                              </a>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)' }}>N/A</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 8px' }}>
+                            {history.status === 'success' ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 600 }}>
+                                <CheckCircle size={14} /> Success
+                              </span>
+                            ) : (
+                              <span 
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#ef4444', fontWeight: 600, cursor: 'help' }}
+                                title={history.error_message || 'Unknown Error'}
+                              >
+                                <AlertTriangle size={14} /> Failed
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

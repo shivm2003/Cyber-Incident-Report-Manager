@@ -160,3 +160,15 @@ class ScanHistory(Base):
     started_at = Column(DateTime, default=datetime.datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
     status = Column(String, default="running") # 'running', 'completed', 'canceled'
+
+class JiraPushHistory(Base):
+    __tablename__ = "jira_push_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    entity_type = Column(String)  # 'cve' or 'incident'
+    entity_id = Column(String)    # CVE-ID or Incident Database ID
+    summary = Column(String)
+    ticket_key = Column(String, nullable=True)
+    status = Column(String)       # 'success' or 'failed'
+    error_message = Column(String, nullable=True)
+    pushed_at = Column(DateTime, default=datetime.datetime.utcnow)

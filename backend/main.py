@@ -46,6 +46,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from automation_scheduler import start_automation_scheduler
+import asyncio
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(start_automation_scheduler())
+
 # --- BACKGROUND TASKS ---
 def run_analysis_on_new_incidents(db: Session):
     """Background task to run Shivam AI classification and description enhancement."""
@@ -149,6 +156,13 @@ def collect_data(background_tasks: BackgroundTasks, timeframe: str = "today", db
     print(f"[*] Starting RSS collection for timeframe: {timeframe}")
     rss_result = fetch_rss_feeds(db, timeframe=timeframe)
     background_tasks.add_task(run_analysis_on_new_incidents, db)
+    
+    # Also trigger the Jira and Impact automation pipeline
+    from automation_scheduler import process_incident_automation
+    if isinstance(rss_result, dict) and "new_ids" in rss_result:
+        for inc_id in rss_result["new_ids"]:
+            background_tasks.add_task(process_incident_automation, db, inc_id)
+            
     return {"rss": rss_result}
 
 @app.get("/api/collect/nvd")
@@ -157,10 +171,12 @@ def collect_nvd_data(background_tasks: BackgroundTasks, timeframe: str = "today"
     print(f"[*] Starting NVD collection for timeframe: {timeframe}")
     nvd_result = fetch_nvd_india_incidents(db, timeframe=timeframe)
     
-    # Process the new CVEs with AI in the background
+    # Process the new CVEs with AI and Automation in the background
+    from automation_scheduler import process_cve_automation
     if isinstance(nvd_result, dict) and "new_ids" in nvd_result:
         for cve_id in nvd_result["new_ids"]:
             background_tasks.add_task(process_cve_ai, db, cve_id)
+            background_tasks.add_task(process_cve_automation, db, cve_id)
             
     return {"nvd": nvd_result}
 
@@ -171,11 +187,46 @@ def collect_nvd_advanced(params: schemas.NVDSearchParams, background_tasks: Back
     search_dict = params.dict()
     nvd_result = fetch_nvd_advanced(db, search_dict)
     
+    from automation_scheduler import process_cve_automation
     if isinstance(nvd_result, dict) and "new_ids" in nvd_result:
         for cve_id in nvd_result["new_ids"]:
             background_tasks.add_task(process_cve_ai, db, cve_id)
+            background_tasks.add_task(process_cve_automation, db, cve_id)
             
     return nvd_result
+
+from automation_scheduler import run_manual_automation
+import automation_scheduler
+
+@app.post("/api/automation/run")
+def trigger_manual_automation(request: schemas.AutomationRunRequest, background_tasks: BackgroundTasks):
+    if automation_scheduler.is_automation_running:
+        return {"status": "Already running"}
+    background_tasks.add_task(run_manual_automation, request)
+    return {"status": "Automation cycle triggered"}
+
+@app.get("/api/automation/status")
+def get_automation_status():
+    last_run = automation_scheduler.last_automation_run
+    return {
+        "is_running": automation_scheduler.is_automation_running,
+        "status_message": automation_scheduler.current_status_message,
+        "last_run": last_run.isoformat() if last_run else "Never",
+        "interval_hours": automation_scheduler.scheduler_interval_hours
+    }
+
+class IntervalUpdateRequest(schemas.BaseModel):
+    interval_hours: int
+
+@app.post("/api/automation/interval")
+def set_automation_interval(request: IntervalUpdateRequest):
+    automation_scheduler.scheduler_interval_hours = request.interval_hours
+    return {"status": "success", "interval_hours": automation_scheduler.scheduler_interval_hours}
+
+@app.get("/api/jira/push-history", response_model=List[schemas.JiraPushHistoryResponse])
+def get_jira_push_history(db: Session = Depends(get_db)):
+    history = db.query(models.JiraPushHistory).order_by(models.JiraPushHistory.pushed_at.desc()).limit(100).all()
+    return history
 
 @app.get("/api/stats")
 def get_stats(db: Session = Depends(get_db)):
@@ -1129,16 +1180,57 @@ def publish_report_to_jira(
                 if files_payload:
                     upload_res = upload_jira_attachments(ticket_key, files_payload)
                     if not upload_res["success"]:
+                        entity_type = "cve" if str(id).startswith("CVE") else "incident"
+                        push_history = models.JiraPushHistory(
+                            entity_type=entity_type,
+                            entity_id=str(id),
+                            summary=summary,
+                            ticket_key=ticket_key,
+                            status="success",
+                            error_message="Attachment error: " + upload_res["error"]
+                        )
+                        db.add(push_history)
+                        db.commit()
                         return {
                             "success": True, 
                             "ticket_key": ticket_key, 
                             "attachment_error": upload_res["error"]
                         }
             
+            entity_type = "cve" if str(id).startswith("CVE") else "incident"
+            push_history = models.JiraPushHistory(
+                entity_type=entity_type,
+                entity_id=str(id),
+                summary=summary,
+                ticket_key=ticket_key,
+                status="success"
+            )
+            db.add(push_history)
+            db.commit()
             return {"success": True, "ticket_key": ticket_key}
         else:
+            entity_type = "cve" if str(id).startswith("CVE") else "incident"
+            push_history = models.JiraPushHistory(
+                entity_type=entity_type,
+                entity_id=str(id),
+                summary=summary,
+                status="failed",
+                error_message=res.get("error", "Unknown JIRA error")
+            )
+            db.add(push_history)
+            db.commit()
             return {"success": False, "status_code": res["status_code"], "error": res["error"]}
     except Exception as e:
+        entity_type = "cve" if str(id).startswith("CVE") else "incident"
+        push_history = models.JiraPushHistory(
+            entity_type=entity_type,
+            entity_id=str(id),
+            summary=summary,
+            status="failed",
+            error_message=str(e)
+        )
+        db.add(push_history)
+        db.commit()
         raise HTTPException(status_code=500, detail=str(e))
 
 

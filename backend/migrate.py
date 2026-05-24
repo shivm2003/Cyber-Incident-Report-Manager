@@ -74,6 +74,15 @@ def migrate():
         ],
         "combined_reports": [
             ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        ],
+        "jira_push_history": [
+            ("entity_type", "VARCHAR"),
+            ("entity_id", "VARCHAR"),
+            ("summary", "VARCHAR"),
+            ("ticket_key", "VARCHAR"),
+            ("status", "VARCHAR"),
+            ("error_message", "VARCHAR"),
+            ("pushed_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         ]
     }
     
