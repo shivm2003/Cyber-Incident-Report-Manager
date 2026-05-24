@@ -787,7 +787,7 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             incident.heuristic_match_details = res.get("heuristic_match_details")
             incident.version_relevance = res.get("version_relevance", 0)
             # Flag for manual review if score is high
-            if res["score"] >= 70:
+            if res["score"] >= 60:
                 incident.impact_flag = 1
                 incident.review_status = "Pending"
                 inc_threats += 1
@@ -832,7 +832,7 @@ def run_company_impact_scan(db: Session, full_scan: bool = False, engine: str = 
             cve.extracted_versions = res.get("extracted_versions")
             cve.heuristic_match_details = res.get("heuristic_match_details")
             cve.version_relevance = res.get("version_relevance", 0)
-            if res["score"] >= 70:
+            if res["score"] >= 60:
                 cve.impact_flag = 1
                 cve.review_status = "Pending"
                 cve_threats += 1
@@ -906,6 +906,8 @@ def update_company_profile(req: schemas.CompanyProfileBase, db: Session = Depend
     profile.company_name = req.company_name
     profile.tech_stack = [t.model_dump() if hasattr(t, 'model_dump') else t.dict() if hasattr(t, 'dict') else t for t in req.tech_stack]
     profile.industry = req.industry
+    if req.auto_retry_start_date is not None:
+        profile.auto_retry_start_date = req.auto_retry_start_date
     profile.last_updated = datetime.datetime.utcnow()
     
     db.commit()
@@ -1303,6 +1305,30 @@ def download_single_report(id: int, format: str, include_forensic: bool = False,
         return FileResponse(file_path, filename=f"AI_Impact_Report_{id}.docx", media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     
     return {"error": "Invalid format. Use 'pdf' or 'word'."}
+
+@app.get("/api/reports/by-incident/{incident_id}/download/pdf")
+def download_report_by_incident(incident_id: int, include_forensic: bool = True, db: Session = Depends(get_db)):
+    """Downloads a specific AI Impact Report in PDF format using the Incident ID."""
+    report = db.query(models.ImpactReport).filter(models.ImpactReport.incident_id == incident_id).first()
+    if not report:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Impact Report not found for this incident")
+    
+    report.incident = db.query(models.Incident).filter(models.Incident.id == report.incident_id).first()
+    mitre_mappings = db.query(models.MitreMapping).filter(models.MitreMapping.incident_id == report.incident_id).all()
+    
+    forensic_content = None
+    if include_forensic and report.incident and report.incident.full_analysis:
+        forensic_content = report.incident.full_analysis
+    
+    file_path = reporting.generate_single_impact_pdf(report, mitre_mappings, forensic_content=forensic_content)
+    return FileResponse(file_path, filename=f"AI_Impact_Report_INC_{incident_id}.pdf", media_type="application/pdf")
+
+@app.get("/api/automation/report/latest")
+def get_latest_automation_report(timeframe_hours: int = 24, db: Session = Depends(get_db)):
+    """Generates and downloads a summary report of the latest automation execution."""
+    file_path = reporting.generate_automation_summary_pdf(db, timeframe_hours=timeframe_hours)
+    return FileResponse(file_path, filename=f"Automation_Execution_Report_{timeframe_hours}h.pdf", media_type="application/pdf")
 
 # --- REPORT BUILDER ENDPOINTS ---
 

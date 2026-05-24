@@ -22,7 +22,7 @@ const JiraPublisher = () => {
   const [pushHistory, setPushHistory] = useState([]);
   const [automationStatus, setAutomationStatus] = useState({ is_running: false, last_run: 'Never' });
   const [triggeringAutomation, setTriggeringAutomation] = useState(false);
-  
+  const [autoRetryDate, setAutoRetryDate] = useState('2026-05-20');
   // Automation Config State
   const [configNvd, setConfigNvd] = useState(true);
   const [nvdTimeframe, setNvdTimeframe] = useState('month');
@@ -40,6 +40,17 @@ const JiraPublisher = () => {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    fetch('http://localhost:8000/api/company-profile')
+      .then(res => res.json())
+      .then(data => {
+        if(data && data.auto_retry_start_date) {
+           setAutoRetryDate(data.auto_retry_start_date.split('T')[0]);
+        }
+      })
+      .catch(err => console.error("Failed to load company profile", err));
   }, []);
 
   const getCveReports = () => {
@@ -656,6 +667,32 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                 </div>
               </div>
 
+              <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: 'var(--surface-color)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <h4 style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Auto-Retry Sweep Config</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>Sweep Start Date</span>
+                  <input 
+                    type="date" 
+                    value={autoRetryDate}
+                    onChange={(e) => {
+                       const newDate = e.target.value;
+                       setAutoRetryDate(newDate);
+                       fetch('http://localhost:8000/api/company-profile')
+                         .then(res => res.json())
+                         .then(profile => {
+                           profile.auto_retry_start_date = newDate + "T00:00:00";
+                           fetch('http://localhost:8000/api/company-profile', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify(profile)
+                           });
+                         });
+                    }}
+                    style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}
+                  />
+                </div>
+              </div>
+
               <button
                 onClick={triggerAutomation}
                 className="btn-primary"
@@ -670,7 +707,7 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                 <span>Sync & Analyze Now</span>
               </button>
               <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '12px', lineHeight: '1.4' }}>
-                Instantly crawls NVD and RSS feeds, runs Impact Radar on new threats, generates PDF reports, and pushes to Jira if impact &gt;= 70.
+                Instantly crawls NVD and RSS feeds, runs Impact Radar on new threats, generates PDF reports, and pushes to Jira if impact &gt;= 60.
               </p>
 
               {/* Pipeline Visualization */}
@@ -745,12 +782,13 @@ Breach Method: ${report.breach_method || 'N/A'}`;
 
           <div className="rb-discovery-col">
             <div className="rb-discovery-card-v2 glass-card-v2" style={{ height: '100%' }}>
-              <h3 className="rb-panel-title" style={{ marginBottom: '20px' }}>Ticket Publishing History</h3>
+              <h3 className="rb-panel-title" style={{ marginBottom: '20px' }}>Ticket Publishing History ({pushHistory.length})</h3>
               
               <div style={{ overflowX: 'auto' }}>
                 <table className="rb-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '12px 8px', fontWeight: 600 }}>S.N.</th>
                       <th style={{ padding: '12px 8px', fontWeight: 600 }}>Date/Time</th>
                       <th style={{ padding: '12px 8px', fontWeight: 600 }}>Entity</th>
                       <th style={{ padding: '12px 8px', fontWeight: 600 }}>Summary</th>
@@ -761,13 +799,16 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                   <tbody>
                     {pushHistory.length === 0 ? (
                       <tr>
-                        <td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
                           No Jira tickets pushed yet.
                         </td>
                       </tr>
                     ) : (
-                      pushHistory.map(history => (
+                      pushHistory.map((history, index) => (
                         <tr key={history.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '12px 8px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                            {pushHistory.length - index}
+                          </td>
                           <td style={{ padding: '12px 8px', whiteSpace: 'nowrap' }}>
                             {new Date(history.pushed_at).toLocaleString()}
                           </td>
@@ -783,7 +824,19 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                             }}>
                               {history.entity_type}
                             </span>
-                            <div style={{ fontSize: '12px', marginTop: '4px', fontWeight: 600 }}>{history.entity_id}</div>
+                            <div style={{ fontSize: '12px', marginTop: '4px', fontWeight: 600 }}>
+                              <a 
+                                href={history.entity_type === 'cve' 
+                                  ? `http://localhost:8000/api/cve/by-cve-id/${history.entity_id}/report` 
+                                  : `http://localhost:8000/api/reports/by-incident/${history.entity_id}/download/pdf`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: 'var(--text-main)', textDecoration: 'underline', cursor: 'pointer' }}
+                                title="Click to view full PDF report"
+                              >
+                                {history.entity_id}
+                              </a>
+                            </div>
                           </td>
                           <td style={{ padding: '12px 8px', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={history.summary}>
                             {history.summary}

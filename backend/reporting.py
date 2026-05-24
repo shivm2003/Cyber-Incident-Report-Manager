@@ -952,3 +952,138 @@ def generate_single_cve_pdf(cve):
             
     doc.build(elements, onFirstPage=_draw_report_header_footer, onLaterPages=_draw_report_header_footer)
     return file_path
+
+import datetime
+
+def generate_automation_summary_pdf(db, timeframe_hours=24):
+    """
+    Generates a PDF summary of the automation cycle's Impact Radar results.
+    """
+    import tempfile
+    import os
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    
+    import models
+
+    cutoff_time = datetime.datetime.utcnow() - datetime.timedelta(hours=timeframe_hours)
+    
+    logs = db.query(models.AutomationAuditLog).filter(
+        models.AutomationAuditLog.created_at >= cutoff_time
+    ).order_by(models.AutomationAuditLog.created_at.desc()).all()
+    
+    temp_dir = tempfile.gettempdir()
+    file_path = os.path.join(temp_dir, f"Automation_Summary_Report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
+    
+    doc = SimpleDocTemplate(
+        file_path, 
+        pagesize=letter,
+        rightMargin=40, leftMargin=40,
+        topMargin=50, bottomMargin=50
+    )
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('MainTitle', parent=styles['Heading1'], fontSize=20, textColor=colors.HexColor("#0a0e17"))
+    header_style = ParagraphStyle('SectionHeader', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor("#1e1b4b"), spaceBefore=15, spaceAfter=8)
+    body_style = ParagraphStyle('ReportBody', parent=styles['Normal'], fontSize=9, leading=12)
+    
+    elements = []
+    
+    # Title
+    elements.append(Paragraph("AUTOMATION & IMPACT RADAR EXECUTION REPORT", title_style))
+    elements.append(Paragraph(f"Reporting Period: Last {timeframe_hours} Hours", body_style))
+    elements.append(Paragraph(f"Generated On: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC", body_style))
+    elements.append(Spacer(1, 20))
+    
+    # Summary Metrics
+    total_scanned = len(logs)
+    matched_logs = [log for log in logs if log.impact_score >= 60]
+    rejected_logs = [log for log in logs if log.impact_score < 60]
+    
+    summary_data = [
+        [Paragraph("<b>Metric</b>", body_style), Paragraph("<b>Value</b>", body_style)],
+        [Paragraph("Total Items Scanned", body_style), Paragraph(str(total_scanned), body_style)],
+        [Paragraph("Impact Radar Matches (>= 60)", body_style), Paragraph(f"<font color='red'><b>{len(matched_logs)}</b></font>", body_style)],
+        [Paragraph("Impact Radar Rejections (< 60)", body_style), Paragraph(f"<font color='green'><b>{len(rejected_logs)}</b></font>", body_style)]
+    ]
+    t_summary = Table(summary_data, colWidths=[200, 100])
+    t_summary.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e7eb")),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
+        ('PADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(t_summary)
+    elements.append(Spacer(1, 20))
+    
+    # Matches Table
+    elements.append(Paragraph("IMPACT RADAR MATCHES (High Risk / Pushed to Jira)", header_style))
+    if matched_logs:
+        match_data = [[Paragraph("<b>ID</b>", body_style), Paragraph("<b>Type</b>", body_style), Paragraph("<b>Target/Vendor</b>", body_style), Paragraph("<b>Score</b>", body_style), Paragraph("<b>Match Details</b>", body_style)]]
+        for log in matched_logs[:50]: # Limit to 50 for brevity
+            reason = "N/A"
+            if log.entity_type.lower() == 'cve':
+                cve_obj = db.query(models.CVE).filter(models.CVE.cve_id == log.entity_id).first()
+                if cve_obj and cve_obj.company_impact_reason: reason = cve_obj.company_impact_reason
+            elif log.entity_type.lower() == 'incident':
+                try:
+                    inc_obj = db.query(models.Incident).filter(models.Incident.id == int(log.entity_id)).first()
+                    if inc_obj and inc_obj.company_impact_reason: reason = inc_obj.company_impact_reason
+                except:
+                    pass
+                    
+            match_data.append([
+                Paragraph(log.entity_id, body_style),
+                Paragraph(log.entity_type.upper(), body_style),
+                Paragraph(log.entity_title or "Unknown", body_style),
+                Paragraph(f"<font color='red'><b>{log.impact_score}</b></font>", body_style),
+                Paragraph(reason, body_style)
+            ])
+        t_matches = Table(match_data, colWidths=[80, 50, 150, 40, 200])
+        t_matches.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e7eb")),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#fee2e2")),
+            ('PADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(t_matches)
+    else:
+        elements.append(Paragraph("No items matched the Impact Radar criteria in this timeframe.", body_style))
+        
+    elements.append(Spacer(1, 20))
+    
+    # Rejections Table
+    elements.append(Paragraph("IMPACT RADAR REJECTIONS (Low Risk / Ignored)", header_style))
+    if rejected_logs:
+        rej_data = [[Paragraph("<b>ID</b>", body_style), Paragraph("<b>Type</b>", body_style), Paragraph("<b>Target/Vendor</b>", body_style), Paragraph("<b>Score</b>", body_style), Paragraph("<b>Match Details</b>", body_style)]]
+        for log in rejected_logs[:50]: # Limit to 50
+            reason = "N/A"
+            if log.entity_type.lower() == 'cve':
+                cve_obj = db.query(models.CVE).filter(models.CVE.cve_id == log.entity_id).first()
+                if cve_obj and cve_obj.company_impact_reason: reason = cve_obj.company_impact_reason
+            elif log.entity_type.lower() == 'incident':
+                try:
+                    inc_obj = db.query(models.Incident).filter(models.Incident.id == int(log.entity_id)).first()
+                    if inc_obj and inc_obj.company_impact_reason: reason = inc_obj.company_impact_reason
+                except:
+                    pass
+                    
+            rej_data.append([
+                Paragraph(log.entity_id, body_style),
+                Paragraph(log.entity_type.upper(), body_style),
+                Paragraph(log.entity_title or "Unknown", body_style),
+                Paragraph(str(log.impact_score), body_style),
+                Paragraph(reason, body_style)
+            ])
+        t_rej = Table(rej_data, colWidths=[80, 50, 150, 40, 200])
+        t_rej.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e7eb")),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#dcfce7")),
+            ('PADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(t_rej)
+    else:
+        elements.append(Paragraph("No items were rejected by the Impact Radar in this timeframe.", body_style))
+
+    doc.build(elements)
+    return file_path

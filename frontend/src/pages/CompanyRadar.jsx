@@ -213,18 +213,18 @@ const CompanyRadar = ({
                   padding: '16px', 
                   background: 'rgba(255,255,255,0.02)', 
                   border: '1px solid var(--border)', 
-                  borderLeft: `4px solid ${inc.company_impact_score >= 70 ? '#ef4444' : '#f59e0b'}`,
+                  borderLeft: `4px solid ${inc.company_impact_score >= 60 ? '#ef4444' : '#f59e0b'}`,
                   borderRadius: '8px', 
-                  cursor: inc.source_type === 'incident' ? 'pointer' : 'default',
+                  cursor: 'pointer',
                   display: 'grid',
                   gridTemplateColumns: '60px 1fr 100px',
                   gap: '16px',
                   alignItems: 'center'
                 }} 
-                onClick={() => { if(inc.source_type === 'incident') setSelectedRawIncident(inc); }}
+                onClick={() => setSelectedRawIncident(inc)}
               >
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '20px', fontWeight: 900, color: inc.company_impact_score >= 70 ? '#ef4444' : '#f59e0b' }}>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: inc.company_impact_score >= 60 ? '#ef4444' : '#f59e0b' }}>
                     {inc.company_impact_score || 0}%
                   </div>
                   <div style={{ fontSize: '8px', fontWeight: 800, color: 'var(--text-muted)', marginTop: '4px' }}>CONFIDENCE</div>

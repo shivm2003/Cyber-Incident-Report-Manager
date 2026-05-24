@@ -675,8 +675,8 @@ function App() {
         const incNo = currentData.filter(inc => inc.company_impact_status === 'No' && (!targetMethod || inc.detection_method === targetMethod)).length;
         const incPending = currentData.filter(inc => !inc.company_impact_status || inc.company_impact_status === 'Pending' || (targetMethod && inc.detection_method !== targetMethod)).length;
 
-        const cveYes = currentCveData.filter(cve => cve.company_impact_reason && cve.company_impact_score >= 70 && (!targetMethod || cve.detection_method === targetMethod)).length;
-        const cveNo = currentCveData.filter(cve => cve.company_impact_reason && cve.company_impact_score < 70 && (!targetMethod || cve.detection_method === targetMethod)).length;
+        const cveYes = currentCveData.filter(cve => cve.company_impact_reason && cve.company_impact_score >= 60 && (!targetMethod || cve.detection_method === targetMethod)).length;
+        const cveNo = currentCveData.filter(cve => cve.company_impact_reason && cve.company_impact_score < 60 && (!targetMethod || cve.detection_method === targetMethod)).length;
         const cvePending = currentCveData.filter(cve => !cve.company_impact_reason || (targetMethod && cve.detection_method !== targetMethod)).length;
 
         const threatsYes = incYes + cveYes;
