@@ -106,7 +106,7 @@ const ImpactReports = ({
               <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', color: activeReport?.id === rep.id ? 'var(--primary)' : 'var(--text-main)' }}>
                 {rep.incident_title || `AI Report #${rep.id}`}
               </div>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(rep.created_at).toLocaleDateString()}</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(rep.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
             </div>
           ))}
           {reports.length === 0 && (
@@ -143,7 +143,7 @@ const ImpactReports = ({
                   REPORT ID: #{activeReport.id}
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  DATE: {new Date(activeReport.created_at).toLocaleDateString()}
+                  DATE: {new Date(activeReport.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
                   <button 
@@ -201,7 +201,7 @@ const ImpactReports = ({
                   <div>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Fetched Date</div>
                     <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)', marginTop: '4px' }}>
-                      {activeReport.incident?.date_collected ? new Date(activeReport.incident.date_collected).toLocaleString() : new Date(activeReport.created_at).toLocaleString()}
+                      {activeReport.incident?.date_collected ? new Date(activeReport.incident.date_collected).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : new Date(activeReport.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                     </div>
                   </div>
                   <div>

@@ -189,10 +189,12 @@ class CompanyProfileBase(BaseModel):
     company_name: str
     tech_stack: list[TechItem | str | dict]
     industry: str
+    auto_retry_start_date: datetime | None = None
 
 class CompanyProfile(CompanyProfileBase):
     id: int
     last_updated: datetime
+    auto_retry_start_date: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -388,6 +390,7 @@ class CompanyProfileBase(BaseModel):
 class CompanyProfile(CompanyProfileBase):
     id: int
     last_updated: datetime
+    auto_retry_start_date: datetime | None = None
 
     class Config:
         from_attributes = True

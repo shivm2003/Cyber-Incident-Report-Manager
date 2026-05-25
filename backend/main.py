@@ -11,7 +11,7 @@ import models
 import schemas
 from database import engine, get_db
 from collectors.rss_collector import fetch_rss_feeds
-from collectors.nvd_api_collector import fetch_nvd_india_incidents, fetch_single_cve, save_cve_to_db, fetch_nvd_advanced, process_cve_ai
+from collectors.nvd_api_collector import fetch_nvd_india_incidents, fetch_single_cve, save_cve_to_db, fetch_nvd_advanced
 from analyzer import classify_attack
 import reporting
 import datetime
@@ -157,12 +157,6 @@ def collect_data(background_tasks: BackgroundTasks, timeframe: str = "today", db
     rss_result = fetch_rss_feeds(db, timeframe=timeframe)
     background_tasks.add_task(run_analysis_on_new_incidents, db)
     
-    # Also trigger the Jira and Impact automation pipeline
-    from automation_scheduler import process_incident_automation
-    if isinstance(rss_result, dict) and "new_ids" in rss_result:
-        for inc_id in rss_result["new_ids"]:
-            background_tasks.add_task(process_incident_automation, db, inc_id)
-            
     return {"rss": rss_result}
 
 @app.get("/api/collect/nvd")
@@ -175,7 +169,6 @@ def collect_nvd_data(background_tasks: BackgroundTasks, timeframe: str = "today"
     from automation_scheduler import process_cve_automation
     if isinstance(nvd_result, dict) and "new_ids" in nvd_result:
         for cve_id in nvd_result["new_ids"]:
-            background_tasks.add_task(process_cve_ai, db, cve_id)
             background_tasks.add_task(process_cve_automation, db, cve_id)
             
     return {"nvd": nvd_result}
@@ -190,7 +183,6 @@ def collect_nvd_advanced(params: schemas.NVDSearchParams, background_tasks: Back
     from automation_scheduler import process_cve_automation
     if isinstance(nvd_result, dict) and "new_ids" in nvd_result:
         for cve_id in nvd_result["new_ids"]:
-            background_tasks.add_task(process_cve_ai, db, cve_id)
             background_tasks.add_task(process_cve_automation, db, cve_id)
             
     return nvd_result
@@ -225,7 +217,10 @@ def set_automation_interval(request: IntervalUpdateRequest):
 
 @app.get("/api/jira/push-history", response_model=List[schemas.JiraPushHistoryResponse])
 def get_jira_push_history(db: Session = Depends(get_db)):
-    history = db.query(models.JiraPushHistory).order_by(models.JiraPushHistory.pushed_at.desc()).limit(100).all()
+    # Filter out internal batch-member records (individual CVEs logged for dedup only)
+    history = db.query(models.JiraPushHistory).filter(
+        ~models.JiraPushHistory.summary.like("Pushed as part of batch ticket%")
+    ).order_by(models.JiraPushHistory.pushed_at.desc()).limit(100).all()
     return history
 
 @app.get("/api/automation/audit-logs", response_model=List[schemas.AutomationAuditLogResponse])
@@ -1204,6 +1199,12 @@ def publish_report_to_jira(
                 if str(id).startswith("CVE"):
                     cve_obj = db.query(models.CVE).filter(models.CVE.cve_id == str(id)).first()
                     if cve_obj:
+                        from collectors.mitre_api_collector import fetch_mitre_cve
+                        if not cve_obj.raw_data or "cveMetadata" not in cve_obj.raw_data:
+                            mitre_data = fetch_mitre_cve(cve_obj.cve_id)
+                            if mitre_data and "cveMetadata" in mitre_data:
+                                cve_obj.raw_data = mitre_data
+                                db.commit()
                         generated_pdf_path = generate_single_cve_pdf(cve_obj)
                 elif str(id).isdigit() and str(id) != "0":
                     impact_rep = db.query(models.ImpactReport).filter(models.ImpactReport.id == int(id)).first()

@@ -8,59 +8,25 @@ import uuid
 
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 
-def process_cve_ai(db: Session, cve_id: int):
+
+def extract_vendor_product_from_cpe(affected_products):
     """
-    Background worker to extract company, product, and AI summary for a CVE.
+    Extract vendor and product names from CPE 2.3 strings.
+    CPE format: cpe:2.3:part:vendor:product:version:...
+    Returns (vendor, product) tuple using the first valid CPE.
     """
-    cve = db.query(models.CVE).filter(models.CVE.id == cve_id).first()
-    if not cve or cve.ai_processed == 1:
-        return
+    for cpe in (affected_products or []):
+        if not isinstance(cpe, str) or not cpe.startswith("cpe:"):
+            continue
+        parts = cpe.split(":")
+        if len(parts) >= 5:
+            vendor = parts[3].replace("_", " ").title()
+            product = parts[4].replace("_", " ").title()
+            if vendor and product and vendor != "*" and product != "*":
+                return vendor, product
+    return None, None
 
-    # User requested AI Deep Dive Reporting ONLY for crawl data, not NVD API.
-    # We mark it as processed to prevent the auto-retry loop from picking it up.
-    cve.ai_processed = 1
-    db.commit()
-    print(f"[+] AI Enrichment skipped for {cve.cve_id} (Disabled for NVD API)")
-    return
-    if result:
-        company_name = result.get("company_name", "Unknown Vendor")
-        cve.company_name = company_name
-        cve.product_name = result.get("product_name", "Unknown Product")
-        cve.ai_summary = result.get("summary", "")
-        cve.ai_tags = result.get("tags", [])
-        cve.ai_processed = 1
 
-        # Update Company Intelligence
-        company = db.query(models.Company).filter(models.Company.name == company_name).first()
-        v_type = result.get("vulnerability_type")
-        
-        if not company:
-            company = models.Company(
-                name=company_name,
-                total_cves=1,
-                critical_cves=1 if cve.severity == "Critical" else 0,
-                high_cves=1 if cve.severity == "High" else 0,
-                latest_cve=cve.cve_id,
-                vulnerability_types=[v_type] if v_type else []
-            )
-            db.add(company)
-        else:
-            company.total_cves += 1
-            company.latest_cve = cve.cve_id
-            if v_type:
-                types = list(company.vulnerability_types or [])
-                if v_type not in types:
-                    types.append(v_type)
-                company.vulnerability_types = types
-            
-            # Update severity counts
-            if cve.severity == "Critical": company.critical_cves += 1
-            if cve.severity == "High": company.high_cves += 1
-            
-            company.last_updated = datetime.utcnow()
-
-        db.commit()
-        print(f"[+] AI Enrichment complete for {cve.cve_id} ({company_name})")
 
 def fetch_nvd_cves(db: Session, timeframe: str = "today"):
     """
@@ -166,6 +132,9 @@ def fetch_nvd_cves(db: Session, timeframe: str = "today"):
                 # Duplicacy Check
                 existing_cve = db.query(models.CVE).filter(models.CVE.cve_id == cve_id).first()
                 if not existing_cve:
+                    # Extract vendor/product from CPE data
+                    cpe_vendor, cpe_product = extract_vendor_product_from_cpe(affected_products)
+                    
                     new_cve = models.CVE(
                         cve_id=cve_id,
                         description=summary,
@@ -175,6 +144,8 @@ def fetch_nvd_cves(db: Session, timeframe: str = "today"):
                         references=references,
                         published_date=pub_date,
                         last_modified_date=mod_date,
+                        company_name=cpe_vendor,
+                        product_name=cpe_product,
                         pull_type="Standard Intelligence Pull",
                         pull_params={"timeframe": timeframe},
                         search_session_id=session_id,
@@ -296,6 +267,9 @@ def fetch_nvd_advanced(db: Session, search_params: dict):
                 # Save to DB
                 existing = db.query(models.CVE).filter(models.CVE.cve_id == cve_id).first()
                 if not existing:
+                    # Extract vendor/product from CPE data
+                    cpe_vendor, cpe_product = extract_vendor_product_from_cpe(affected_products)
+                    
                     new_cve = models.CVE(
                         cve_id=cve_id,
                         description=summary,
@@ -305,6 +279,8 @@ def fetch_nvd_advanced(db: Session, search_params: dict):
                         references=references,
                         published_date=pub_date,
                         last_modified_date=mod_date,
+                        company_name=cpe_vendor,
+                        product_name=cpe_product,
                         pull_type="Advanced Intelligence Pull",
                         pull_params=search_params,
                         search_session_id=session_id,
@@ -453,7 +429,6 @@ def save_cve_to_db(db: Session, cve_data: dict):
     db.commit()
     db.refresh(new_cve)
     
-    # Process AI
-    process_cve_ai(db, new_cve.id)
     
+
     return new_cve

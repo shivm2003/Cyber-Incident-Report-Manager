@@ -324,10 +324,10 @@ const Dashboard = ({
                   <div style={{ fontWeight: 600 }}>{inc.target_entity || inc.country}</div>
                   <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{inc.country}</div>
                 </td>
-                <td>{inc.happened_at ? new Date(inc.happened_at).toLocaleDateString() : 'N/A'}</td>
+                <td>{inc.happened_at ? new Date(inc.happened_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A'}</td>
                 <td>
-                  <div style={{ fontSize: '12px' }}>{new Date(inc.date_collected).toLocaleDateString()}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(inc.date_collected).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                  <div style={{ fontSize: '12px' }}>{new Date(inc.date_collected).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(inc.date_collected).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })}</div>
                 </td>
                 <td style={{ textAlign: 'center' }}>
                   {inc.company_impact_status === 'Yes' ? (

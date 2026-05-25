@@ -16,7 +16,8 @@ const JiraPublisher = () => {
   const [result, setResult] = useState(null);
   const [loadingReports, setLoadingReports] = useState(true);
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [sourceType, setSourceType] = useState('incident');
+  const [sourceType, setSourceType] = useState('cve');
+  const [manualProductName, setManualProductName] = useState('');
   const [reportSearch, setReportSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [pushHistory, setPushHistory] = useState([]);
@@ -26,8 +27,6 @@ const JiraPublisher = () => {
   // Automation Config State
   const [configNvd, setConfigNvd] = useState(true);
   const [nvdTimeframe, setNvdTimeframe] = useState('month');
-  const [configIncident, setConfigIncident] = useState(true);
-  const [incidentTimeframe, setIncidentTimeframe] = useState('week');
   
   const dropdownRef = useRef(null);
 
@@ -102,6 +101,12 @@ const JiraPublisher = () => {
     };
   }, [automationStatus.is_running]);
 
+  useEffect(() => {
+    if (sourceType === 'cve' && selectedReportId) {
+      setSummary(`[Vulnerability Batch] ${manualProductName || 'Unknown Product'} — 1 CVE Detected`);
+    }
+  }, [manualProductName]);
+
   const fetchPushHistory = () => {
     fetch('http://localhost:8000/api/jira/push-history')
       .then(res => res.json())
@@ -130,8 +135,8 @@ const JiraPublisher = () => {
   };
 
   const triggerAutomation = () => {
-    if (!configNvd && !configIncident) {
-      alert("Please select at least one sync source (NVD or Incident).");
+    if (!configNvd) {
+      alert("Please select at least one sync source (NVD).");
       return;
     }
     setTriggeringAutomation(true);
@@ -140,9 +145,7 @@ const JiraPublisher = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         run_nvd: configNvd,
-        nvd_timeframe: nvdTimeframe,
-        run_incident: configIncident,
-        incident_timeframe: incidentTimeframe
+        nvd_timeframe: nvdTimeframe
       })
     })
       .then(res => res.json())
@@ -197,7 +200,10 @@ Breach Method: ${report.breach_method || 'N/A'}`;
       const cveReports = getCveReports();
       const cve = cveReports.find(c => c.metadata.cve_id === reportId);
       if (cve) {
-        setSummary(`[Vulnerability] ${cve.metadata.cve_id} | ${cve.vulnerability?.title || 'CVE Details'}`);
+        const products = cve.affected?.products || [];
+        const foundProduct = products.length > 0 ? `${products[0].vendor} ${products[0].product}`.trim() : '';
+        setManualProductName(foundProduct);
+        setSummary(`[Vulnerability Batch] ${foundProduct || 'Unknown Product'} — 1 CVE Detected`);
         
         const desc = `CVE ID: ${cve.metadata.cve_id}\n` +
           `Severity: ${cve.scoring?.cvss_severity || 'Unknown'} (${cve.scoring?.cvss_score || 'N/A'})\n` +
@@ -285,26 +291,7 @@ Breach Method: ${report.breach_method || 'N/A'}`;
           <div className="rb-config-panel glass-card-v2">
             <h3 className="rb-panel-title">1. Select AI Report</h3>
             
-            <div className="rb-input-group" style={{ marginBottom: '15px' }}>
-              <label className="rb-config-label">Report Source Type</label>
-              <select
-                value={sourceType}
-                onChange={e => {
-                  setSourceType(e.target.value);
-                  setSelectedReportId('');
-                  setReportSearch('');
-                  setSummary('');
-                  setDescription('');
-                  setImpact('Customer Impacted');
-                  setSeverity('');
-                  setRemarks('Immediate action required.');
-                }}
-                className="rb-config-input"
-              >
-                <option value="incident">AI Incident Report</option>
-                <option value="cve">CVE Extractor Report</option>
-              </select>
-            </div>
+
 
             <div className="rb-input-group" ref={dropdownRef} style={{ position: 'relative' }}>
               <label className="rb-config-label">Source Report</label>
@@ -409,6 +396,18 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                 style={{ opacity: 0.8, cursor: 'not-allowed' }}
               />
             </div>
+            {sourceType === 'cve' && (
+              <div className="rb-input-group">
+                <label className="rb-config-label">Product Name (For Grouping)</label>
+                <input
+                  type="text"
+                  value={manualProductName}
+                  onChange={e => setManualProductName(e.target.value)}
+                  className="rb-config-input"
+                  placeholder="e.g., Google Chrome"
+                />
+              </div>
+            )}
             <div className="rb-input-group">
               <label className="rb-config-label">Issue Type</label>
               <input
@@ -623,7 +622,7 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Last Automated Run:</span>
                   <span style={{ fontWeight: 'bold' }}>
-                    {automationStatus.last_run !== 'Never' ? new Date(automationStatus.last_run).toLocaleString() : 'Never'}
+                    {automationStatus.last_run !== 'Never' ? new Date(automationStatus.last_run).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'Never'}
                   </span>
                 </div>
               </div>
@@ -649,22 +648,7 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                   </select>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--text-main)' }}>
-                    <input type="checkbox" checked={configIncident} onChange={e => setConfigIncident(e.target.checked)} />
-                    Incident Feed Sync
-                  </label>
-                  <select 
-                    value={incidentTimeframe} 
-                    onChange={e => setIncidentTimeframe(e.target.value)}
-                    disabled={!configIncident}
-                    style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid var(--border)', backgroundColor: configIncident ? 'var(--bg-color)' : 'var(--surface-color)', color: 'var(--text-main)' }}
-                  >
-                    <option value="today">Today</option>
-                    <option value="week">Last 7 Days</option>
-                    <option value="month">Last 30 Days</option>
-                  </select>
-                </div>
+
               </div>
 
               <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: 'var(--surface-color)', borderRadius: '8px', border: '1px solid var(--border)' }}>
@@ -707,7 +691,7 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                 <span>Sync & Analyze Now</span>
               </button>
               <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '12px', lineHeight: '1.4' }}>
-                Instantly crawls NVD and RSS feeds, runs Impact Radar on new threats, generates PDF reports, and pushes to Jira if impact &gt;= 60.
+                Instantly crawls NVD API feeds, runs Impact Radar on new threats, generates PDF reports, and pushes to Jira if impact &gt;= 60.
               </p>
 
               {/* Pipeline Visualization */}
@@ -734,47 +718,24 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                         <Database size={12} /> Fetch NVD API data
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                        <Target size={12} /> Run AI Impact Radar
+                        <Target size={12} /> Run Impact Radar
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                        <FileText size={12} /> Generate PDF reports
+                        <Layers size={12} color="#8b5cf6" /> Group CVEs by Product
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
                         <GitCommit size={12} /> Check for Duplicacy
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                        <UploadCloud size={12} color="#10b981" /> Push to Jira
+                        <FileText size={12} /> Generate PDF reports per CVE
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <UploadCloud size={12} color="#10b981" /> Push Batch Ticket to Jira
                       </div>
                     </div>
                   </div>
 
-                  {/* Phase 2 */}
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                      <div style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#f59e0b', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1 }}>
-                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#fff' }}></div>
-                      </div>
-                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Phase 2: Incident Crawling</span>
-                    </div>
-                    
-                    <div style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                        <Rss size={12} /> Crawl RSS feeds
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                        <Zap size={12} /> Impact Radar (CVE mapping)
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                        <Target size={12} /> Deep AI Impact & Mitre
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                        <GitCommit size={12} /> Check for Duplicacy
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                        <UploadCloud size={12} color="#10b981" /> Push Incident & PDFs
-                      </div>
-                    </div>
-                  </div>
+
                 </div>
               </div>
             </div>
@@ -810,32 +771,43 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                             {pushHistory.length - index}
                           </td>
                           <td style={{ padding: '12px 8px', whiteSpace: 'nowrap' }}>
-                            {new Date(history.pushed_at).toLocaleString()}
+                            {new Date(history.pushed_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                           </td>
                           <td style={{ padding: '12px 8px' }}>
                             <span style={{ 
                               padding: '2px 6px', 
                               borderRadius: '4px', 
                               fontSize: '11px', 
-                              backgroundColor: history.entity_type === 'cve' ? '#fee2e2' : '#e0e7ff',
-                              color: history.entity_type === 'cve' ? '#ef4444' : '#4f46e5',
+                              backgroundColor: history.entity_type === 'cve_batch' ? '#f3e8ff' : history.entity_type === 'cve' ? '#fee2e2' : '#e0e7ff',
+                              color: history.entity_type === 'cve_batch' ? '#7c3aed' : history.entity_type === 'cve' ? '#ef4444' : '#4f46e5',
                               fontWeight: 'bold',
                               textTransform: 'uppercase'
                             }}>
-                              {history.entity_type}
+                              {history.entity_type === 'cve_batch' ? 'CVE BATCH' : history.entity_type}
                             </span>
                             <div style={{ fontSize: '12px', marginTop: '4px', fontWeight: 600 }}>
-                              <a 
-                                href={history.entity_type === 'cve' 
-                                  ? `http://localhost:8000/api/cve/by-cve-id/${history.entity_id}/report` 
-                                  : `http://localhost:8000/api/reports/by-incident/${history.entity_id}/download/pdf`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ color: 'var(--text-main)', textDecoration: 'underline', cursor: 'pointer' }}
-                                title="Click to view full PDF report"
-                              >
-                                {history.entity_id}
-                              </a>
+                              {history.entity_type === 'cve_batch' ? (
+                                <span style={{ color: 'var(--text-main)' }}>
+                                  {(() => {
+                                    const parts = (history.entity_id || '').split(':');
+                                    const product = (parts[0] || 'Unknown').replace(/,/g, ', ');
+                                    const cves = (parts[1] || '').split(',').filter(Boolean);
+                                    return `${product.charAt(0).toUpperCase() + product.slice(1)} (${cves.length} CVEs)`;
+                                  })()}
+                                </span>
+                              ) : (
+                                <a 
+                                  href={history.entity_type === 'cve' 
+                                    ? `http://localhost:8000/api/cve/by-cve-id/${history.entity_id}/report` 
+                                    : `http://localhost:8000/api/reports/by-incident/${history.entity_id}/download/pdf`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: 'var(--text-main)', textDecoration: 'underline', cursor: 'pointer' }}
+                                  title="Click to view full PDF report"
+                                >
+                                  {history.entity_id}
+                                </a>
+                              )}
                             </div>
                           </td>
                           <td style={{ padding: '12px 8px', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={history.summary}>
@@ -861,6 +833,24 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                                   >
                                     <FileText size={12} /> View PDF Report
                                   </a>
+                                )}
+                                {history.entity_type === 'cve_batch' && history.entity_id && (
+                                  <div style={{ marginTop: '6px' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Attached Reports:</span>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                                      {(history.entity_id.split(':')[1] || '').split(',').filter(Boolean).map(cveId => (
+                                        <a
+                                          key={cveId}
+                                          href={`http://localhost:8000/api/cve/by-cve-id/${cveId}/report`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          style={{ color: '#10b981', fontSize: '10px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '2px', backgroundColor: '#ecfdf5', padding: '2px 4px', borderRadius: '4px', border: '1px solid #10b981', fontWeight: 600 }}
+                                        >
+                                          <FileText size={10} /> {cveId}
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
                                 )}
                               </div>
                             ) : (

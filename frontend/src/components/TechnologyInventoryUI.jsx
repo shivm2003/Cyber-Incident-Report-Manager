@@ -129,7 +129,7 @@ const TechnologyInventoryUI = ({ profile, onUpdate, isSaving }) => {
             <h3 style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 800, color: 'var(--text-muted)', margin: 0, letterSpacing: '1px' }}>Current Tech Stack</h3>
             {profile.last_updated && (
               <span style={{ fontSize: '10px', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                LAST SYNC: {new Date(profile.last_updated).toLocaleString()}
+                LAST SYNC: {new Date(profile.last_updated).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
               </span>
             )}
           </div>

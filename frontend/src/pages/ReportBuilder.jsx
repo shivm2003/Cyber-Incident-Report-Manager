@@ -198,7 +198,7 @@ const ReportBuilder = ({
                     <div className="rb-history-title">{h.report_title}</div>
                     <button className="rb-btn-icon-danger" onClick={() => handleDeleteReportBuilderConfig(h.id)}><Trash2 size={14} /></button>
                   </div>
-                  <div className="rb-history-date">{new Date(h.created_at).toLocaleString()}</div>
+                  <div className="rb-history-date">{new Date(h.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
                   <div className="rb-history-actions">
                     <button onClick={() => window.open(`${API_BASE}/reports/builder/download/${h.id}/pdf`, '_blank')} className="btn-mini pdf">PDF Export</button>
                     <button onClick={() => window.open(`${API_BASE}/reports/builder/download/${h.id}/docx`, '_blank')} className="btn-mini docx">Word Export</button>
@@ -254,7 +254,7 @@ const ReportBuilder = ({
                           <td style={{ width: '120px' }}><span className={`badge ${(inc.severity || 'Low').toLowerCase()}`}>{inc.severity}</span></td>
                           <td>
                             <div className="rb-row-title">{inc.title}</div>
-                            <div className="rb-row-meta">{inc.happened_at ? new Date(inc.happened_at).toLocaleDateString() : 'N/A'} • {inc.country || 'Global'}</div>
+                            <div className="rb-row-meta">{inc.happened_at ? new Date(inc.happened_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A'} • {inc.country || 'Global'}</div>
                           </td>
                         </tr>
                       ))}
@@ -308,7 +308,7 @@ const ReportBuilder = ({
                           <td style={{ width: '120px' }}><span className={`badge ${(cve.severity || 'Low').toLowerCase()}`}>{cve.severity}</span></td>
                           <td>
                             <div className="rb-row-title purple">{cve.cve_id}</div>
-                            <div className="rb-row-meta">{cve.company_name} / {cve.product_name} • Published: {cve.published_date ? new Date(cve.published_date).toLocaleDateString() : 'N/A'}</div>
+                            <div className="rb-row-meta">{cve.company_name} / {cve.product_name} • Published: {cve.published_date ? new Date(cve.published_date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A'}</div>
                           </td>
                         </tr>
                       ))}
