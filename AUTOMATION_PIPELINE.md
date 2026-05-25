@@ -13,9 +13,10 @@ When triggered, the system executes the following strict order of operations:
 
 1. **NVD API Synchronization**: Queries the National Vulnerability Database for new CVEs. Vendor and product names are automatically extracted from CPE strings during ingestion.
 2. **Deterministic Version Scanner**: Runs each new CVE through the version-aware Impact Radar to identify exact product/version overlaps and generate a `company_impact_score`.
-3. **Product Grouping**: All high-impact CVEs (score `>= 60`) are grouped by their matched product (e.g., all Java CVEs into one group, all Apache CVEs into another).
-4. **Duplicate Check**: Each CVE is checked against the push history to prevent re-pushing already-ticketed vulnerabilities.
-5. **Batch Jira Push**: For each product group, the system creates **one consolidated Jira ticket** containing all related CVEs. Individual PDF forensic reports are generated per CVE and attached to the batch ticket.
+3. **MITRE Vulnrichment Extraction**: Before grouping, the system intercepts CVEs that lack NVD CPE assignments and fetches the rich MITRE API data to accurately identify the affected product name (e.g., Google Chrome).
+4. **Product Grouping**: All high-impact CVEs (score `>= 60`) are grouped by their matched product (e.g., all Java CVEs into one group, all Apache CVEs into another). Unclassified CVEs are explicitly skipped and reserved for manual review.
+5. **Duplicate Check**: Each CVE is checked against the push history to prevent re-pushing already-ticketed vulnerabilities.
+6. **Batch Jira Push**: For each product group, the system creates **one consolidated Jira ticket** containing all related CVEs. Individual PDF forensic reports are generated per CVE and attached to the batch ticket.
 
 ### Batch Ticketing Example
 Instead of creating 5 separate tickets for 5 Java CVEs, the system creates:
@@ -40,6 +41,11 @@ The history table displays all pushed tickets with distinct entity types:
 - **CVE** (red badge): Individual CVE records
 - **CVE BATCH** (purple badge): Grouped product-level tickets showing the product name and CVE count
 
+**PDF Downloads:** You can directly download the rich, MITRE-compliant PDF reports for any CVE (or all CVEs within a batch) straight from the history table using the interactive download tags, without needing to open Jira.
+
+### Manual Overrides & Fallbacks
+If a CVE is completely unclassified (missing all vendor/product data), it skips automation. When manually pushing these CVEs via the publisher UI, a **Product Name** input field dynamically appears. Typing in this field auto-formats the Jira ticket summary to match the standard automated batch format (e.g., `[Vulnerability Batch] Google Chrome — 1 CVE Detected`).
+
 ### Dual-Speed Polling System
 To ensure a seamless user experience, the UI intelligently polls the backend:
 - **Passive Polling (30 seconds)**: While viewing the page, the UI quietly checks for updates every 30 seconds. If the background scheduler pushes a ticket autonomously, it seamlessly appears in the History Table without requiring a page refresh.
@@ -56,6 +62,11 @@ By default, the background scheduler runs every 3 hours using the lightweight `"
 You can trigger the entire pipeline instantly using the **"Sync & Analyze Now"** button. 
 - The UI provides dropdowns allowing you to selectively choose how far back to scan NVD data (Today, Last 7 Days, Last 30 Days).
 - *Note: Any manual data fetching triggered from other parts of the application (e.g., the "Fetch Live Data" button on the Dashboard) is also hooked into the automation pipeline, ensuring that any newly discovered data is always evaluated for Jira escalation.*
+
+### Auto-Retry Sweep Mechanism
+A robust **Auto-Retry Sweep Configuration** allows administrators to define a global "Sweep Start Date" via the Company Profile configuration. 
+- During every automated cycle, the system runs a sweeping query to catch and re-process any un-scanned vulnerabilities (where `ai_processed == 0`) published on or after the specified date.
+- This ensures zero-miss tolerance if the automation was offline or if NVD data dropped sporadically.
 
 ## 4. Audit Trail & History
 
