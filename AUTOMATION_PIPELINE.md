@@ -11,7 +11,7 @@ The automation is driven by a non-blocking asynchronous Python background schedu
 ### The Automation Cycle
 When triggered, the system executes the following strict order of operations:
 1. **NVD API Synchronization**: Queries the National Vulnerability Database for new CVEs.
-2. **CVE Impact Radar**: Runs the new CVEs through the AI Impact Radar to generate a `company_impact_score`.
+2. **CVE Impact Radar**: Runs the new CVEs through the generate a `company_impact_score`.
 3. **CVE Jira Push**: If the CVE's impact score is `>= 70`, the system automatically generates a professional PDF forensic report (`reporting.py`) and pushes a structured ticket to Jira Cloud with the PDF attached.
 4. **RSS Incident Synchronization**: Crawls leading cybersecurity news feeds for new threat incidents.
 5. **Incident Impact Radar**: Analyzes new incidents using AI to extract MITRE TTPs and calculate a company impact score.

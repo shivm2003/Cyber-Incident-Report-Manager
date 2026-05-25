@@ -1234,21 +1234,21 @@ def publish_report_to_jira(
                 upload_res = upload_jira_attachments(ticket_key, files_payload)
                 if not upload_res["success"]:
                     entity_type = "cve" if str(id).startswith("CVE") else "incident"
-                        push_history = models.JiraPushHistory(
-                            entity_type=entity_type,
-                            entity_id=str(id),
-                            summary=summary,
-                            ticket_key=ticket_key,
-                            status="success",
-                            error_message="Attachment error: " + upload_res["error"]
-                        )
-                        db.add(push_history)
-                        db.commit()
-                        return {
-                            "success": True, 
-                            "ticket_key": ticket_key, 
-                            "attachment_error": upload_res["error"]
-                        }
+                    push_history = models.JiraPushHistory(
+                        entity_type=entity_type,
+                        entity_id=str(id),
+                        summary=summary,
+                        ticket_key=ticket_key,
+                        status="success",
+                        error_message="Attachment error: " + upload_res["error"]
+                    )
+                    db.add(push_history)
+                    db.commit()
+                    return {
+                        "success": True, 
+                        "ticket_key": ticket_key, 
+                        "attachment_error": upload_res["error"]
+                    }
             
             entity_type = "cve" if str(id).startswith("CVE") else "incident"
             push_history = models.JiraPushHistory(
