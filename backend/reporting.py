@@ -983,13 +983,14 @@ def generate_single_cve_pdf(cve):
     sub_p = Paragraph(f"<b>{cve.cve_id}</b> &bull; {vendor_product} &bull; {state}", subtitle_style)
     
     badge_data = [[
-        Paragraph(f"<font size=10 color='white'><b>CVSS 3.1</b></font><br/><font size=24 color='white'><b>{cvss_score}</b></font><br/><font size=10 color='white'><b>{sev}</b></font>", ParagraphStyle('b', alignment=TA_CENTER))
+        Paragraph(f"<font size=10 color='white'><b>CVSS 3.1</b></font><br/><font size=24 color='white'><b>{cvss_score}</b></font><br/><font size=10 color='white'><b>{sev}</b></font>", ParagraphStyle('b', alignment=TA_CENTER, leading=18))
     ]]
-    badge_table = Table(badge_data, colWidths=[80], rowHeights=[70])
+    badge_table = Table(badge_data, colWidths=[80], rowHeights=[110])
     badge_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,0), colors.HexColor(sev_bg)),
         ('ALIGN', (0,0), (0,0), 'CENTER'),
         ('VALIGN', (0,0), (0,0), 'MIDDLE'),
+        ('PADDING', (0,0), (0,0), (5, 10)),
         ('ROUNDEDCORNERS', [8, 8, 8, 8]),
     ]))
 
