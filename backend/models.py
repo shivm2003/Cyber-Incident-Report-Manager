@@ -178,11 +178,11 @@ class AutomationAuditLog(Base):
     __tablename__ = "automation_audit_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    entity_type = Column(String) # 'cve' or 'incident'
-    entity_id = Column(String) # CVE ID or Incident ID
-    entity_title = Column(String)
-    scan_status = Column(String) # 'Success', 'Failed'
-    match_status = Column(String) # 'Matched', 'Not Matched'
+    entity_type = Column(String(50)) # 'cve' or 'incident'
+    entity_id = Column(String(5000)) # CVE ID or Incident ID
+    entity_title = Column(String(500))
+    scan_status = Column(String(50)) # 'Success', 'Failed'
+    match_status = Column(String(50)) # 'Matched', 'Not Matched'
     impact_score = Column(Integer, default=0)
-    details = Column(String, nullable=True)
+    details = Column(String(50000), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
