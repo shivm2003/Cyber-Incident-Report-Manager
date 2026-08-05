@@ -586,10 +586,9 @@ def analyze_dynamic_impact(title: str, description: str, profile: dict, engine: 
 def analyze_cve_impact(cve_id: str, description: str, affected_products: list, profile: dict, engine: str = 'all') -> dict:
     from version_engine import scan_threat_version_aware
     tech_stack = profile.get('tech_stack', [])
-    industry = profile.get('industry', 'Technology')
     result = scan_threat_version_aware(
         title=f'CVE Vulnerability: {cve_id}', description=description or '',
-        affected_products=affected_products or [], tech_stack=tech_stack, industry=industry
+        affected_products=affected_products or [], tech_stack=tech_stack, use_industry_match=False
     )
     
     extracted = {}

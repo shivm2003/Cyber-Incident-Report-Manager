@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Shield, Check } from 'lucide-react';
+import { Shield, Check, Trash2 } from 'lucide-react';
 
-const ManualReviewQueueUI = ({ queue, onUpdateStatus, onSelectItem }) => {
+const ManualReviewQueueUI = ({ queue, onUpdateStatus, onClearAll, onSelectItem }) => {
   const [activeTab, setActiveTab] = useState('incidents'); // 'incidents' or 'cves'
 
   const items = activeTab === 'incidents' ? queue.incidents : queue.cves;
@@ -22,6 +22,35 @@ const ManualReviewQueueUI = ({ queue, onUpdateStatus, onSelectItem }) => {
           style={{ flex: 1, margin: 0, justifyContent: 'center' }}
         >
           NVD Vulnerabilities ({queue.cves.length})
+        </button>
+        
+        <button 
+          onClick={onClearAll}
+          style={{
+            background: 'rgba(239, 68, 68, 0.1)',
+            color: '#ef4444',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            padding: '8px 16px',
+            borderRadius: '10px',
+            fontWeight: 800,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.2s ease',
+            marginLeft: 'auto'
+          }}
+          onMouseOver={e => {
+            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseOut={e => {
+            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          <Trash2 size={16} />
+          Clear All Reviews
         </button>
       </div>
 
@@ -65,14 +94,14 @@ const ManualReviewQueueUI = ({ queue, onUpdateStatus, onSelectItem }) => {
                     
                     {item.detection_method && (
                       <span style={{ 
-                        background: item.detection_method.includes('Version') ? 'rgba(245, 158, 11, 0.1)' : item.detection_method.includes('Industry') ? 'rgba(99, 102, 241, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
-                        color: item.detection_method.includes('Version') ? '#f59e0b' : item.detection_method.includes('Industry') ? '#818cf8' : '#10b981', 
+                        background: item.detection_method.includes('Version') ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
+                        color: item.detection_method.includes('Version') ? '#f59e0b' : '#10b981', 
                         padding: '4px 8px', 
                         borderRadius: '6px', 
                         fontSize: '9px', 
                         fontWeight: 900,
                         textTransform: 'uppercase',
-                        border: `1px solid ${item.detection_method.includes('Version') ? 'rgba(245, 158, 11, 0.2)' : item.detection_method.includes('Industry') ? 'rgba(99, 102, 241, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`
+                        border: `1px solid ${item.detection_method.includes('Version') ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`
                       }}>
                         {item.detection_method}
                       </span>

@@ -930,6 +930,19 @@ def update_review_status(req: schemas.ReviewStatusUpdate, db: Session = Depends(
     db.commit()
     return {"status": "Updated", "new_status": req.status}
 
+@app.post("/api/intelligence/clear-review-queue")
+def clear_review_queue(db: Session = Depends(get_db)):
+    incidents = db.query(models.Incident).filter(models.Incident.impact_flag == 1, models.Incident.review_status == "Pending").all()
+    cves = db.query(models.CVE).filter(models.CVE.impact_flag == 1, models.CVE.review_status == "Pending").all()
+    
+    for item in incidents:
+        item.review_status = "Dismissed"
+    for item in cves:
+        item.review_status = "Dismissed"
+        
+    db.commit()
+    return {"status": "Cleared", "cleared_incidents": len(incidents), "cleared_cves": len(cves)}
+
 @app.post("/api/incidents/{incident_id}/regenerate-summary", response_model=schemas.Incident)
 def regenerate_incident_summary(incident_id: int, db: Session = Depends(get_db)):
     incident = db.query(models.Incident).filter(models.Incident.id == incident_id).first()

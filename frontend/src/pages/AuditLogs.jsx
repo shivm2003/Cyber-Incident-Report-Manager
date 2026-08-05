@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatIST } from '../utils/dateUtils';
 import { Terminal, ShieldCheck, Database, Zap } from 'lucide-react';
 
 const AuditLogs = ({ auditLogs }) => {
@@ -67,7 +68,7 @@ const AuditLogs = ({ auditLogs }) => {
                 <div>
                   <div style={{ fontSize: '11px', color: '#a855f7', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>{session.pull_type}</div>
                   <div style={{ fontSize: '15px', fontWeight: 700, marginTop: '4px', color: 'var(--text-main)' }}>Session: {session.session_id.substring(0, 12)}...</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{new Date(session.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{formatIST(session.timestamp)}</div>
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>

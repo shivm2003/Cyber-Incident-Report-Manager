@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, CheckCircle, AlertTriangle, Shield, User, FileText, Activity, RefreshCw, Search, ChevronDown, Database, Target, UploadCloud, Rss, Layers, Zap, GitCommit } from 'lucide-react';
+import { formatIST } from '../utils/dateUtils';
+import { Send, CheckCircle, AlertTriangle, Shield, User, FileText, Activity, RefreshCw, Search, ChevronDown, Database, Target, UploadCloud, Rss, Layers, Zap, GitCommit, X } from 'lucide-react';
 
-const JiraPublisher = () => {
+const JiraPublisher = ({ showManualModal, setShowManualModal }) => {
   const [reports, setReports] = useState([]);
   const [selectedReportId, setSelectedReportId] = useState('');
   const [projectKey] = useState('CI');
@@ -273,17 +274,19 @@ Breach Method: ${report.breach_method || 'N/A'}`;
   };
 
   return (
-    <div className="rb-container fade-in">
-      <div className="rb-hero-v2">
-        <div className="rb-hero-content">
-          <div className="rb-hero-badge">
-            <Activity size={14} color="#a855f7" /> <span>JIRA SERVICE DESK INTEGRATION</span>
-          </div>
-          <h2>Jira Incident Publisher</h2>
-          <p>Push detailed forensic threat reports, severity rankings, and AI-generated impact summaries directly to Atlassian Jira.</p>
-        </div>
-        <div className="jira-hero-bg"></div>
-      </div>
+    <div className="rb-container fade-in" style={{ padding: '10px 0' }}>
+      {showManualModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={() => setShowManualModal(false)}>
+          <div style={{ width: '90%', maxWidth: '1000px', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-main)', borderRadius: '16px', border: '1px solid var(--border)', padding: '24px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowManualModal(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer' }}><X size={24} /></button>
+            <div className="rb-hero-v2" style={{ marginBottom: '24px' }}>
+              <div className="rb-hero-content">
+                <div className="rb-hero-badge">
+                  <Activity size={14} color="#a855f7" /> <span>MANUAL JIRA PUBLISHER</span>
+                </div>
+                <h2>Create Ticket</h2>
+              </div>
+            </div>
 
       <form onSubmit={handleSubmit} className="rb-grid">
         {/* Sidebar Configuration */}
@@ -583,10 +586,18 @@ Breach Method: ${report.breach_method || 'N/A'}`;
           </div>
         </div>
       </form>
+          </div>
+        </div>
+      )}
 
       {/* AUTOMATION CONTROL & PUSH HISTORY SECTION */}
-      <div style={{ marginTop: '40px', paddingBottom: '40px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px', color: 'var(--text-main)' }}>Jira Automation Scheduler & Push History</h2>
+      <div style={{ paddingBottom: '40px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ padding: '8px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '10px', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
+            <Activity size={20} color="#a855f7" />
+          </div>
+          Jira Automation Scheduler & Push History
+        </h2>
         
         <div className="rb-grid">
           <div className="rb-sidebar-col">
@@ -622,7 +633,7 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Last Automated Run:</span>
                   <span style={{ fontWeight: 'bold' }}>
-                    {automationStatus.last_run !== 'Never' ? new Date(automationStatus.last_run).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'Never'}
+                    {automationStatus.last_run !== 'Never' ? formatIST(automationStatus.last_run) : 'Never'}
                   </span>
                 </div>
               </div>
@@ -742,8 +753,15 @@ Breach Method: ${report.breach_method || 'N/A'}`;
           </div>
 
           <div className="rb-discovery-col">
-            <div className="rb-discovery-card-v2 glass-card-v2" style={{ height: '100%' }}>
-              <h3 className="rb-panel-title" style={{ marginBottom: '20px' }}>Ticket Publishing History ({pushHistory.length})</h3>
+            <div className="rb-discovery-card-v2 glass-card-v2" style={{ height: '100%', padding: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 className="rb-panel-title" style={{ margin: 0, textTransform: 'uppercase', fontSize: '14px', letterSpacing: '0.5px' }}>Ticket Publishing History ({pushHistory.length})</h3>
+                <select style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', outline: 'none', cursor: 'pointer' }}>
+                  <option>All Status</option>
+                  <option>Success</option>
+                  <option>Failed</option>
+                </select>
+              </div>
               
               <div style={{ overflowX: 'auto' }}>
                 <table className="rb-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -771,17 +789,18 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                             {pushHistory.length - index}
                           </td>
                           <td style={{ padding: '12px 8px', whiteSpace: 'nowrap' }}>
-                            {new Date(history.pushed_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                            {formatIST(history.pushed_at)}
                           </td>
                           <td style={{ padding: '12px 8px' }}>
                             <span style={{ 
-                              padding: '2px 6px', 
+                              padding: '2px 8px', 
                               borderRadius: '4px', 
-                              fontSize: '11px', 
-                              backgroundColor: history.entity_type === 'cve_batch' ? '#f3e8ff' : history.entity_type === 'cve' ? '#fee2e2' : '#e0e7ff',
-                              color: history.entity_type === 'cve_batch' ? '#7c3aed' : history.entity_type === 'cve' ? '#ef4444' : '#4f46e5',
+                              fontSize: '10px', 
+                              backgroundColor: history.entity_type === 'cve_batch' ? 'rgba(168, 85, 247, 0.15)' : history.entity_type === 'cve' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                              color: history.entity_type === 'cve_batch' ? '#c084fc' : history.entity_type === 'cve' ? '#f87171' : '#60a5fa',
                               fontWeight: 'bold',
-                              textTransform: 'uppercase'
+                              textTransform: 'uppercase',
+                              border: `1px solid ${history.entity_type === 'cve_batch' ? 'rgba(168, 85, 247, 0.3)' : history.entity_type === 'cve' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`
                             }}>
                               {history.entity_type === 'cve_batch' ? 'CVE BATCH' : history.entity_type}
                             </span>
@@ -844,7 +863,7 @@ Breach Method: ${report.breach_method || 'N/A'}`;
                                           href={`http://localhost:8000/api/cve/by-cve-id/${cveId}/report`}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          style={{ color: '#10b981', fontSize: '10px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '2px', backgroundColor: '#ecfdf5', padding: '2px 4px', borderRadius: '4px', border: '1px solid #10b981', fontWeight: 600 }}
+                                          style={{ color: '#34d399', fontSize: '10px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 600 }}
                                         >
                                           <FileText size={10} /> {cveId}
                                         </a>

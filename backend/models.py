@@ -27,7 +27,7 @@ class Incident(Base):
     company_impact_score = Column(Integer, default=0) # 0-100 for Radar proximity
     review_status = Column(String, default="Pending") # 'Pending', 'Reviewed', 'Dismissed'
     impact_flag = Column(Integer, default=0) # 1 if high impact, 0 otherwise
-    detection_method = Column(String, nullable=True) # Heuristic (Version-Aware), Heuristic (Industry-Match)
+    detection_method = Column(String, nullable=True) # Heuristic (Version-Aware), Heuristic (Industry-Match) [incidents only]
     scan_iteration = Column(Integer, default=0) # Track which scan iteration detected this
     extracted_versions = Column(JSON, nullable=True)
     heuristic_match_details = Column(JSON, nullable=True)
@@ -95,7 +95,7 @@ class CVE(Base):
     company_impact_reason = Column(String, nullable=True)
     review_status = Column(String, default="Pending") # 'Pending', 'Reviewed', 'Dismissed'
     impact_flag = Column(Integer, default=0) # 1 if high impact, 0 otherwise
-    detection_method = Column(String, nullable=True) # Heuristic (Version-Aware), Heuristic (Industry-Match)
+    detection_method = Column(String, nullable=True) # Heuristic (Version-Aware), Heuristic (Industry-Match) [incidents only]
     scan_iteration = Column(Integer, default=0) # Track which scan iteration detected this
     extracted_versions = Column(JSON, nullable=True)
     heuristic_match_details = Column(JSON, nullable=True)

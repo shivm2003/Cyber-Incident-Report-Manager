@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatIST } from '../utils/dateUtils';
 import { Trash2, Plus, AlertTriangle, CheckCircle, Edit2, Save } from 'lucide-react';
 
 const TechnologyInventoryUI = ({ profile, onUpdate, isSaving }) => {
@@ -129,7 +130,7 @@ const TechnologyInventoryUI = ({ profile, onUpdate, isSaving }) => {
             <h3 style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 800, color: 'var(--text-muted)', margin: 0, letterSpacing: '1px' }}>Current Tech Stack</h3>
             {profile.last_updated && (
               <span style={{ fontSize: '10px', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                LAST SYNC: {new Date(profile.last_updated).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                LAST SYNC: {formatIST(profile.last_updated)}
               </span>
             )}
           </div>

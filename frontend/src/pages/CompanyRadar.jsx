@@ -23,7 +23,6 @@ const CompanyRadar = ({
 
   // Stats
   const versionMatches = detectedThreats.filter(t => t.detection_method && t.detection_method.includes('Version'));
-  const industryMatches = detectedThreats.filter(t => t.detection_method && t.detection_method.includes('Industry'));
   const productMatches = detectedThreats.filter(t => !t.detection_method || t.detection_method === 'Heuristic');
 
   // Reusable Step Component for Flowchart
@@ -156,7 +155,7 @@ const CompanyRadar = ({
       )}
 
       {/* Engine Stats Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
         <div className="glass-card" style={{ padding: '20px', textAlign: 'center', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
           <div style={{ fontSize: '28px', fontWeight: 900, color: '#10b981' }}>{detectedThreats.length}</div>
           <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 800, marginTop: '6px', textTransform: 'uppercase' }}>Total Detected</div>
@@ -164,10 +163,6 @@ const CompanyRadar = ({
         <div className="glass-card" style={{ padding: '20px', textAlign: 'center', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
           <div style={{ fontSize: '28px', fontWeight: 900, color: '#f59e0b' }}>{versionMatches.length}</div>
           <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 800, marginTop: '6px', textTransform: 'uppercase' }}>Version Matches</div>
-        </div>
-        <div className="glass-card" style={{ padding: '20px', textAlign: 'center', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
-          <div style={{ fontSize: '28px', fontWeight: 900, color: '#818cf8' }}>{industryMatches.length}</div>
-          <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 800, marginTop: '6px', textTransform: 'uppercase' }}>Industry Matches</div>
         </div>
         <div className="glass-card" style={{ padding: '20px', textAlign: 'center', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
           <div style={{ fontSize: '28px', fontWeight: 900, color: '#60a5fa' }}>{productMatches.length}</div>
@@ -240,10 +235,10 @@ const CompanyRadar = ({
                     {inc.detection_method && (
                       <span style={{ 
                         fontSize: '8px', fontWeight: 900, 
-                        background: inc.detection_method.includes('Version') ? 'rgba(245, 158, 11, 0.1)' : inc.detection_method.includes('Industry') ? 'rgba(99, 102, 241, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
-                        color: inc.detection_method.includes('Version') ? '#f59e0b' : inc.detection_method.includes('Industry') ? '#818cf8' : '#10b981', 
+                        background: inc.detection_method.includes('Version') ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
+                        color: inc.detection_method.includes('Version') ? '#f59e0b' : '#10b981', 
                         padding: '2px 6px', borderRadius: '4px', 
-                        border: `1px solid ${inc.detection_method.includes('Version') ? 'rgba(245, 158, 11, 0.2)' : inc.detection_method.includes('Industry') ? 'rgba(99, 102, 241, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
+                        border: `1px solid ${inc.detection_method.includes('Version') ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
                         textTransform: 'uppercase'
                       }}>
                         {inc.detection_method}

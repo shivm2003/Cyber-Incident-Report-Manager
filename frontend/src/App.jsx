@@ -5,7 +5,7 @@ import {
   Terminal, BarChart2, FileText, ChevronRight, Zap,
   LayoutDashboard, ShieldCheck, Landmark, Settings,
   ArrowUpRight, Info, AlertOctagon, Shield, X, Sun, Moon, ExternalLink, Database,
-  ArrowUpDown, ArrowUp, ArrowDown, Calendar, RotateCcw, Check, FileDown, History, Trash2, FilePlus
+  ArrowUpDown, ArrowUp, ArrowDown, Calendar, RotateCcw, Check, FileDown, History, Trash2, FilePlus, Bell, Send
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -45,6 +45,7 @@ const FINANCIAL_COLORS = ['#6366f1', '#00f2ff', '#8b5cf6', '#34d399', '#fbbf24']
 
 function App() {
   const [view, setView] = useState('overview'); // overview, india, financial, impact, company
+  const [showJiraModal, setShowJiraModal] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
   const [incidents, setIncidents] = useState([]);
   const [cves, setCves] = useState([]);
@@ -578,6 +579,19 @@ function App() {
     } catch (e) { console.error("Update status failed:", e); }
   };
 
+  const clearReviewQueue = async () => {
+    if (!window.confirm('Are you sure you want to dismiss all pending manual reviews?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/intelligence/clear-review-queue`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        loadReviewQueue();
+        loadData();
+      }
+    } catch (e) { console.error("Clear review queue failed:", e); }
+  };
+
   const handleSaveProfile = async (updatedData = null) => {
     setIsSavingProfile(true);
     try {
@@ -760,9 +774,14 @@ function App() {
   return (
     <div className={`app-container ${theme}-theme`}>
       <aside className="sidebar">
-        <div className="nav-logo">
-          <ShieldAlert color="var(--primary)" size={28} />
-          <h2>INTEL COMMAND</h2>
+        <div className="nav-logo" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '24px 20px', marginBottom: '10px' }}>
+          <div style={{ background: 'rgba(0, 242, 255, 0.1)', padding: '8px', borderRadius: '8px' }}>
+            <ShieldAlert color="var(--primary)" size={24} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '14px', fontWeight: 900, color: '#f0f6fc', letterSpacing: '1px' }}>INTEL</span>
+            <span style={{ fontSize: '14px', fontWeight: 900, color: 'var(--accent)', letterSpacing: '1px' }}>COMMAND</span>
+          </div>
         </div>
 
         <div className={`nav-item ${view === 'overview' ? 'active' : ''}`} onClick={() => setView('overview')}>
@@ -823,17 +842,18 @@ function App() {
       <div className="main-wrapper">
         <header className="main-header">
           <div className="header-search">
-            <Search size={18} />
+            <Search size={18} color="var(--text-muted)" />
             <input 
               type="text" 
               placeholder="Search global intelligence..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            <div style={{ padding: '2px 6px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>⌘K</div>
           </div>
           <div className="header-actions">
             {/* Gemma AI Status Indicator */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid var(--border)', marginRight: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: '20px', border: '1px solid var(--border)', marginRight: '5px' }}>
               <div style={{ 
                 width: '8px', 
                 height: '8px', 
@@ -842,14 +862,24 @@ function App() {
                 boxShadow: aiStatus.online ? '0 0 10px #10b981' : 'none',
                 transition: 'all 0.3s ease'
               }} className={aiStatus.online ? "animate-pulse" : ""}></div>
-              <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '0.5px' }}>
-                AI MODEL ({aiStatus.model || 'gemma4:e4b'}): <span style={{ color: aiStatus.online ? '#10b981' : '#ef4444' }}>{aiStatus.online ? 'ONLINE' : 'OFFLINE'}</span>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '0.5px' }}>
+                AI MODEL <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>({aiStatus.model || 'gemma-4e-4b'})</span>: <span style={{ color: aiStatus.online ? '#10b981' : '#ef4444' }}>{aiStatus.online ? 'ONLINE' : 'OFFLINE'}</span>
               </span>
             </div>
 
-            <button className="btn-ghost" onClick={loadData} style={{ gap: '6px' }}>
+            <button className="btn-ghost" onClick={loadData} style={{ gap: '8px', borderRadius: '8px', padding: '8px 16px', fontSize: '13px' }}>
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> 
               {loading ? 'Syncing...' : 'Sync Intel'}
+            </button>
+            
+            <div style={{ position: 'relative', cursor: 'pointer', padding: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Bell size={18} color="var(--text-muted)" />
+              <div style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#3b82f6', color: '#fff', fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '10px' }}>2</div>
+            </div>
+
+            <button className="btn-primary" onClick={() => { setView('jira'); setShowJiraModal(true); }} style={{ gap: '8px', borderRadius: '8px', padding: '10px 20px', marginLeft: '10px' }}>
+              <Send size={16} /> 
+              Publish Ticket to Jira
             </button>
           </div>
         </header>
@@ -919,6 +949,7 @@ function App() {
             <ManualReview 
               reviewQueue={reviewQueue}
               updateReviewStatus={updateReviewStatus}
+              clearReviewQueue={clearReviewQueue}
               setSelectedRawIncident={setSelectedRawIncident}
             />
           )}
@@ -984,7 +1015,7 @@ function App() {
           )}
 
           {view === 'jira' && (
-            <JiraPublisher />
+            <JiraPublisher showManualModal={showJiraModal} setShowManualModal={setShowJiraModal} />
           )}
 
           {view === 'audit' && <AuditLogs auditLogs={auditLogs} />}

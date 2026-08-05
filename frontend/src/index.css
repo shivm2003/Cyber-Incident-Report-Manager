@@ -1,7 +1,7 @@
 :root {
   /* Midnight Onyx Core Palette */
-  --bg-main: #06080a;
-  --bg-sidebar: #0a0b10;
+  --bg-main: #0a0b12;
+  --bg-sidebar: #0d0f18;
   --bg-card: rgba(13, 17, 23, 0.65);
   --bg-elevated: rgba(33, 38, 45, 0.4);
 
@@ -11,8 +11,8 @@
   --accent-glow: rgba(99, 102, 241, 0.25);
 
   --text-main: #f0f6fc;
-  --text-muted: #8b949e;
-  --text-dim: #484f58;
+  --text-muted: #a0aec0;
+  --text-dim: #718096;
 
   --border: rgba(48, 54, 61, 0.5);
   --border-bright: rgba(0, 242, 255, 0.2);
@@ -47,8 +47,8 @@
   --accent-glow: rgba(37, 99, 235, 0.1);
 
   --text-main: #0f172a;
-  --text-muted: #64748b;
-  --text-dim: #94a3b8;
+  --text-muted: #475569;
+  --text-dim: #64748b;
 
   --border: #e2e8f0;
   --border-bright: rgba(37, 99, 235, 0.2);
@@ -236,6 +236,11 @@
   box-sizing: border-box;
 }
 
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 700;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--bg-main);
@@ -341,19 +346,19 @@ body {
 }
 
 .nav-item.active {
-  color: var(--primary);
-  background: rgba(0, 242, 255, 0.06);
-  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(90deg, rgba(37,99,235,0.1), rgba(168,85,247,0.15));
+  font-weight: 700;
 }
 
 .nav-item.active::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 20%;
-  height: 60%;
+  top: 15%;
+  height: 70%;
   width: 4px;
-  background: var(--primary);
+  background: #00f2ff;
   border-radius: 0 4px 4px 0;
   box-shadow: 0 0 15px var(--primary-glow);
 }
@@ -546,9 +551,10 @@ select:focus {
   padding: 6px 14px;
   border-radius: 8px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  text-shadow: 0 0 8px currentColor;
 }
 
 .badge.critical {

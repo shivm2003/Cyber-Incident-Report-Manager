@@ -269,7 +269,8 @@ def scan_threat_version_aware(
     description: str,
     affected_products: list,
     tech_stack: list,
-    industry: str = "Technology"
+    industry: str = "Technology",
+    use_industry_match: bool = True
 ) -> dict:
     """
     Version-Aware Heuristic Threat Scanner.
@@ -283,6 +284,7 @@ def scan_threat_version_aware(
         affected_products: List of affected product strings (from NVD for CVEs)
         tech_stack: Company's tech stack (list of strings or dicts with name/version)
         industry: Company's industry
+        use_industry_match: If False, skip industry keyword matching (used for CVE path)
     
     Returns:
         {
@@ -366,8 +368,8 @@ def scan_threat_version_aware(
                     })
                     break  # One match per inventory version is enough
 
-    # Step 5: Industry boost (Finance sector aggressiveness)
-    industry_boost = _check_industry_relevance(combined_text, industry)
+    # Step 5: Industry boost (only for incidents, skipped for CVEs)
+    industry_boost = _check_industry_relevance(combined_text, industry) if use_industry_match else False
 
     # Step 6: Calculate final score and build result
     if matches:
@@ -451,7 +453,7 @@ def _determine_match_type(spec: dict) -> str:
     return "product_mention_only"
 
 
-# Financial / industry-specific keywords
+# Financial / industry-specific keywords  seesssseessssseessss
 INDUSTRY_KEYWORDS = {
     "Finance": [
         "banking", "bank", "financial", "fintech", "swift", "payment",
