@@ -218,7 +218,7 @@ def _push_product_batch_ticket(db: Session, product_key: str, cve_list: list):
     for idx, cve in enumerate(cve_list, 1):
         desc_lines.append(f"")
         desc_lines.append(f"[{idx}] {cve.cve_id} | Severity: {cve.severity or 'Unknown'} | CVSS: {cve.cvss_score or 'N/A'}")
-        desc_lines.append(f"Description: {(cve.description or 'No description.')[:200]}")
+        desc_lines.append(f"Description: {cve.description or 'No description.'}")
     
     desc = "\n".join(desc_lines)
     impact = f"Highest CVSS: {max_cvss} | Severity: {highest_severity} | {len(cve_list)} CVEs"

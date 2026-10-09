@@ -859,33 +859,131 @@ def generate_combined_excel(report, incidents, cves, include_crawled_content=Tru
 
     return file_path
 
-def _draw_mitre_report_footer(canvas, doc):
+
+def generate_ai_report_attachment(report, output_format="pdf"):
+    """Render saved Gemma Markdown as a downloadable PDF or Word document."""
+    import html
+    import re
+
+    stem = f"AI_Incident_Report_{report.id}"
+    temp_dir = tempfile.gettempdir()
+    lines = (report.content or "").splitlines()
+    if output_format == "docx":
+        file_path = os.path.join(temp_dir, f"{stem}.docx")
+        doc = Document()
+        doc.add_heading(report.report_title, 0)
+        doc.add_paragraph(f"Generated {report.created_at.strftime('%Y-%m-%d %H:%M UTC') if report.created_at else ''} | Database-grounded AI report")
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("### "):
+                doc.add_heading(stripped[4:], level=3)
+            elif stripped.startswith("## "):
+                doc.add_heading(stripped[3:], level=2)
+            elif stripped.startswith("# "):
+                doc.add_heading(stripped[2:], level=1)
+            elif stripped.startswith(("- ", "* ")):
+                doc.add_paragraph(stripped[2:], style="List Bullet")
+            elif re.match(r"^\d+[.)]\s", stripped):
+                doc.add_paragraph(re.sub(r"^\d+[.)]\s", "", stripped), style="List Number")
+            else:
+                doc.add_paragraph(stripped)
+        doc.add_heading("Report command", level=2)
+        doc.add_paragraph(report.command or "")
+        if getattr(report, "sources", None):
+            doc.add_heading("Evidence sources", level=1)
+            for source in report.sources:
+                line = f"[{source.get('citation', '')}] {source.get('title', 'Untitled')} — {source.get('source') or 'Unknown source'} — {source.get('date') or 'Date not recorded'}"
+                if source.get("url"):
+                    line += f" — {source['url']}"
+                doc.add_paragraph(line, style="List Bullet")
+        doc.save(file_path)
+        return file_path
+
+    file_path = os.path.join(temp_dir, f"{stem}.pdf")
+    doc = SimpleDocTemplate(file_path, pagesize=letter, rightMargin=48, leftMargin=48, topMargin=54, bottomMargin=48)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("AIReportTitle", parent=styles["Title"], textColor=colors.HexColor("#1e1b4b"), spaceAfter=14)
+    heading_style = ParagraphStyle("AIReportHeading", parent=styles["Heading2"], textColor=colors.HexColor("#3730a3"), spaceBefore=14, spaceAfter=7)
+    body_style = ParagraphStyle("AIReportBody", parent=styles["BodyText"], fontSize=9.5, leading=13, spaceAfter=7)
+    elements = [Paragraph(html.escape(report.report_title), title_style), Paragraph("Database-grounded AI security intelligence report", body_style), Spacer(1, 10)]
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            elements.append(Spacer(1, 4))
+        elif stripped.startswith("### "):
+            elements.append(Paragraph(html.escape(stripped[4:]), styles["Heading3"]))
+        elif stripped.startswith("## "):
+            elements.append(Paragraph(html.escape(stripped[3:]), heading_style))
+        elif stripped.startswith("# "):
+            elements.append(Paragraph(html.escape(stripped[2:]), heading_style))
+        else:
+            if stripped.startswith(("- ", "* ")):
+                stripped = "- " + stripped[2:]
+            elif re.match(r"^\d+[.)]\s", stripped):
+                stripped = re.sub(r"^(\d+[.)])\s", r"\1  ", stripped)
+            safe = html.escape(stripped).replace("  ", " &nbsp;")
+            elements.append(Paragraph(safe, body_style))
+    elements.extend([Spacer(1, 14), Paragraph("Report command", heading_style), Paragraph(html.escape(report.command or ""), body_style)])
+    if getattr(report, "sources", None):
+        elements.extend([Spacer(1, 8), Paragraph("Evidence sources", heading_style)])
+        for source in report.sources:
+            source_line = f"[{source.get('citation', '')}] {source.get('title', 'Untitled')} — {source.get('source') or 'Unknown source'} — {source.get('date') or 'Date not recorded'}"
+            if source.get("url"):
+                source_line += f" — {source['url']}"
+            elements.append(Paragraph(html.escape(source_line), body_style))
+    doc.build(elements)
+    return file_path
+
+def _draw_cve_report_header_footer(canvas, doc):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
     canvas.saveState()
-    # Header Accent line
-    canvas.setFillColor(colors.HexColor("#3b82f6")) # Blue
-    canvas.rect(0, letter[1] - 4, letter[0], 4, fill=1, stroke=0)
+    
+    # Top Header Bar
+    canvas.setFillColor(colors.HexColor("#0f172a"))
+    canvas.rect(0, letter[1] - 60, letter[0], 60, fill=1, stroke=0)
+    
+    # Cyan Square Icon
+    canvas.setFillColor(colors.HexColor("#06b6d4"))
+    canvas.rect(40, letter[1] - 40, 14, 14, fill=1, stroke=0)
+    
+    # INTEL COMMAND Text
+    canvas.setFont('Helvetica-Bold', 12)
+    canvas.setFillColor(colors.white)
+    canvas.drawString(62, letter[1] - 37, "INTEL COMMAND")
+    
+    # Right Header Text
+    canvas.setFont('Helvetica', 9)
+    canvas.setFillColor(colors.HexColor("#94a3b8"))
+    canvas.drawRightString(letter[0]-40, letter[1] - 37, "VULNERABILITY INTELLIGENCE REPORT")
     
     # Footer
     canvas.setFont('Helvetica', 8)
-    canvas.setFillColor(colors.HexColor("#94a3b8"))
-    footer_text = "Generated by Shivam AI | This report was extracted directly from MITRE CVE Records"
+    canvas.setFillColor(colors.HexColor("#64748b"))
+    footer_text = "Generated by Shivam AI • Source: MITRE CVE Records"
     canvas.drawString(40, 30, footer_text)
     canvas.line(40, 45, letter[0]-40, 45)
     
     # Page Number
     page_num = canvas.getPageNumber()
     canvas.drawRightString(letter[0]-40, 30, f"Page {page_num}")
+    
     canvas.restoreState()
 
 def generate_single_cve_pdf(cve):
     """
-    Generates a professional, high-fidelity PDF report for a single CVE vulnerability,
-    matching the MITRE CVE Records UI layout.
+    Generates a high-fidelity CVE PDF report matching the new A4 design.
     """
-    import dateutil.parser
-    import dataclasses
-    import json
-    
+    import os, tempfile, json, dataclasses
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+
     mitre_report = None
     try:
         if cve.raw_data and "cveMetadata" in cve.raw_data:
@@ -896,212 +994,332 @@ def generate_single_cve_pdf(cve):
                 mitre_report['affected']['products'] = [dataclasses.asdict(p) for p in mitre_report['affected']['products']]
     except Exception as e:
         print("MITRE parsing error:", e)
-        mitre_report = None
 
     temp_dir = tempfile.gettempdir()
     file_path = os.path.join(temp_dir, f"CVE_Report_{cve.cve_id.replace('-', '_')}.pdf")
-
-    from reportlab.platypus import HRFlowable
 
     doc = SimpleDocTemplate(
         file_path, 
         pagesize=letter,
         rightMargin=40, leftMargin=40,
-        topMargin=50, bottomMargin=60
+        topMargin=80, bottomMargin=60
     )
     
     styles = getSampleStyleSheet()
     
-    # Custom Modern Styles
-    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor("#0f172a"), spaceAfter=2, fontName="Helvetica-Bold", leading=28)
-    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor("#64748b"), spaceAfter=15, fontName="Helvetica")
+    # --- Custom Typography ---
+    title_style = ParagraphStyle('Title', fontName="Helvetica-Bold", fontSize=26, textColor=colors.HexColor("#0f172a"), spaceAfter=6, leading=30)
+    subtitle_style = ParagraphStyle('Subtitle', fontName="Helvetica", fontSize=12, textColor=colors.HexColor("#64748b"), spaceAfter=20, leading=16)
     
-    h2_style = ParagraphStyle('H2', parent=styles['Heading2'], fontSize=14, textColor=colors.HexColor("#1e293b"), spaceBefore=18, spaceAfter=10, fontName="Helvetica-Bold")
-    h3_style = ParagraphStyle('H3', parent=styles['Heading3'], fontSize=12, textColor=colors.HexColor("#334155"), spaceBefore=12, spaceAfter=6, fontName="Helvetica-Bold")
+    h2_style = ParagraphStyle('H2', fontName="Helvetica-Bold", fontSize=14, textColor=colors.HexColor("#0f172a"), spaceBefore=20, spaceAfter=12)
     
-    body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=10.5, leading=16, textColor=colors.HexColor("#334155"))
-    body_bold = ParagraphStyle('BodyBold', parent=body_style, fontName="Helvetica-Bold")
+    body_style = ParagraphStyle('Body', fontName="Helvetica", fontSize=10, textColor=colors.HexColor("#1e293b"), leading=15)
+    body_bold = ParagraphStyle('BodyBold', fontName="Helvetica-Bold", fontSize=10, textColor=colors.HexColor("#0f172a"), leading=15)
     
-    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor("#64748b"), textTransform='uppercase', spaceAfter=2, fontName="Helvetica-Bold")
+    # --- Data Extraction ---
+    cve_id = cve.cve_id or "CVE-UNKNOWN"
     
-    mono_style = ParagraphStyle('Mono', parent=styles['Normal'], fontSize=9, fontName="Courier", textColor=colors.HexColor("#0f172a"), wordWrap='CJK')
-    mono_blue = ParagraphStyle('MonoBlue', parent=mono_style, textColor=colors.HexColor("#2563eb"))
-    
-    link_style = ParagraphStyle('Link', parent=styles['Normal'], fontSize=9.5, fontName="Courier", textColor=colors.HexColor("#3b82f6"), wordWrap='CJK')
-    
-    elements = []
-    
-    # Extract data with fallbacks
-    title = mitre_report["vulnerability"]["title"] if mitre_report else "No Title Available"
-    if not title or title == "N/A": title = "No Title Available"
-    
-    vendor_product = f"{cve.company_name or 'Unknown'} / {cve.product_name or 'Unknown'}"
+    vendor_product = "Unknown Vendor / Product"
     if mitre_report and mitre_report.get("affected", {}).get("products"):
         p = mitre_report["affected"]["products"][0]
         vendor_product = f"{p.get('vendor', 'Unknown')} {p.get('product', '')}".strip()
-    
-    state = "PUBLISHED"
-    
-    pub_date = str(cve.published_date).split(' ')[0] if cve.published_date else "Unknown"
-    upd_date = str(cve.last_modified_date).split(' ')[0] if cve.last_modified_date else "Unknown"
-    
-    desc = cve.description or "No description available."
+    elif cve.company_name or cve.product_name:
+        vendor_product = f"{cve.company_name or ''} {cve.product_name or ''}".strip()
+        
     cwe_id = "N/A"
-    cwe_desc = ""
-    if mitre_report and mitre_report["vulnerability"]["cwes"]:
-        cwe_id = mitre_report["vulnerability"]["cwes"][0]["id"]
-        cwe_desc = mitre_report["vulnerability"]["cwes"][0]["description"]
+    cwe_desc = "Unknown"
+    if mitre_report and mitre_report.get("vulnerability", {}).get("cwes"):
+        cwe_id = mitre_report["vulnerability"]["cwes"][0].get("id", "N/A")
+        cwe_desc = mitre_report["vulnerability"]["cwes"][0].get("description", "Unknown CWE")
+        
+    subtitle_text = f"{vendor_product} — {cwe_desc}"
     
-    cvss_score = cve.cvss_score or "N/A"
     sev = (cve.severity or "UNKNOWN").upper()
+    sev_color = "#f59e0b"
+    if sev == "CRITICAL": sev_color = "#ef4444"
+    elif sev == "HIGH": sev_color = "#f97316"
+    elif sev == "MEDIUM": sev_color = "#f59e0b"
+    elif sev == "LOW": sev_color = "#22c55e"
     
-    # Severity Badge Color
-    sev_bg = "#f59e0b"
-    if sev == "CRITICAL": sev_bg = "#ef4444"
-    elif sev == "HIGH": sev_bg = "#f97316"
-    elif sev == "MEDIUM": sev_bg = "#eab308"
-    elif sev == "LOW": sev_bg = "#22c55e"
+    cvss_score = str(cve.cvss_score or "N/A")
+    if cvss_score != "N/A": cvss_score += " / 10"
     
-    attack_vector = "Unknown"
     cvss_vector = cve.raw_data.get("metrics", {}).get("cvssMetricV31", [{}])[0].get("cvssData", {}).get("vectorString", "Unknown") if cve.raw_data else "Unknown"
     if cvss_vector == "Unknown" and mitre_report:
-        cvss_vector = mitre_report["scoring"]["cvss_vector"] or "Unknown"
+        cvss_vector = mitre_report.get("scoring", {}).get("cvss_vector", "Unknown") or "Unknown"
         
-    if cvss_vector != "Unknown":
-        if "AV:N" in cvss_vector: attack_vector = "Network"
-        elif "AV:L" in cvss_vector: attack_vector = "Local"
-        elif "AV:A" in cvss_vector: attack_vector = "Adjacent"
-        elif "AV:P" in cvss_vector: attack_vector = "Physical"
+    attack_vector = "UNKNOWN"
+    if "AV:N" in cvss_vector: attack_vector = "NETWORK"
+    elif "AV:L" in cvss_vector: attack_vector = "LOCAL"
+    elif "AV:A" in cvss_vector: attack_vector = "ADJACENT"
+    elif "AV:P" in cvss_vector: attack_vector = "PHYSICAL"
+    
+    exec_summary = cve.ai_summary if cve.ai_summary else (cve.description or "No description available.")
+    
+    elements = []
+    
+    # 1. Title Section
+    elements.append(Paragraph(cve_id, title_style))
+    elements.append(Paragraph(subtitle_text, subtitle_style))
+    
+    # 2. Metrics Grid
+    def make_metric_box(label, val, sub, color_hex):
+        p_label = Paragraph(f"<font color='{color_hex}'><b>{label}</b></font>", ParagraphStyle('CBL', fontSize=8, alignment=TA_CENTER, fontName="Helvetica-Bold"))
+        p_val = Paragraph(f"<font color='{color_hex}'>{val}</font>", ParagraphStyle('CBV', fontSize=18, alignment=TA_CENTER, fontName="Helvetica-Bold", spaceBefore=10, spaceAfter=8))
+        p_sub = Paragraph(f"<font color='#64748b'>{sub}</font>", ParagraphStyle('CBS', fontSize=8, alignment=TA_CENTER, fontName="Helvetica"))
         
-    prod_count = len(cve.affected_products) if cve.affected_products else 0
-    if mitre_report:
-        prod_count = mitre_report["affected"].get("product_count", prod_count)
+        t = Table([[p_label], [p_val], [p_sub]], colWidths=[120])
+        t.setStyle(TableStyle([
+            ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#e2e8f0")),
+            ('LINEABOVE', (0,0), (-1,0), 3, colors.HexColor(color_hex)),
+            ('BOTTOMPADDING', (0,-1), (-1,-1), 12),
+            ('TOPPADDING', (0,0), (-1,0), 12),
+        ]))
+        return t
 
-    # Header Section
-    elements.append(Paragraph("VULNERABILITY REPORT", label_style))
-    title_p = Paragraph(title, title_style)
-    sub_p = Paragraph(f"<b>{cve.cve_id}</b> &bull; {vendor_product} &bull; {state}", subtitle_style)
+    box1 = make_metric_box("SEVERITY", sev, "CVSS risk level", sev_color)
+    box2 = make_metric_box("CVSS 3.1 SCORE", cvss_score, "Base score", "#3b82f6")
+    box3 = make_metric_box("ATTACK VECTOR", attack_vector, "Remote attack surface", "#06b6d4")
+    box4 = make_metric_box("CWE", cwe_id, cwe_desc[:25] + ("..." if len(cwe_desc) > 25 else ""), "#8b5cf6")
     
-    badge_data = [[
-        Paragraph(f"<font size=10 color='white'><b>CVSS 3.1</b></font><br/><font size=24 color='white'><b>{cvss_score}</b></font><br/><font size=10 color='white'><b>{sev}</b></font>", ParagraphStyle('b', alignment=TA_CENTER, leading=18))
-    ]]
-    badge_table = Table(badge_data, colWidths=[80], rowHeights=[110])
-    badge_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (0,0), colors.HexColor(sev_bg)),
-        ('ALIGN', (0,0), (0,0), 'CENTER'),
-        ('VALIGN', (0,0), (0,0), 'MIDDLE'),
-        ('PADDING', (0,0), (0,0), (5, 10)),
-        ('ROUNDEDCORNERS', [8, 8, 8, 8]),
-    ]))
-
-    header_layout = Table([[ [title_p, sub_p], badge_table ]], colWidths=[400, 100])
-    header_layout.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('ALIGN', (1,0), (1,0), 'RIGHT'),
-    ]))
-    elements.append(header_layout)
-    
-    # Custom Divider
-    elements.append(Spacer(1, 10))
-    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0"), spaceBefore=0, spaceAfter=20))
-    
-    # Description
-    elements.append(Paragraph("Vulnerability Description", h2_style))
-    elements.append(Paragraph(desc, body_style))
-    elements.append(Spacer(1, 20))
-    
-    # Grid info
-    grid_data = [
-        [Paragraph("CWE ID", label_style), Paragraph("PUBLISHED", label_style)],
-        [Paragraph(f"<b>{cwe_id}</b><br/><font size=9 color='#64748b'>{cwe_desc}</font>", body_style), Paragraph(f"<b>{pub_date}</b><br/><font size=9 color='#64748b'>Updated: {upd_date}</font>", body_style)],
-        [Paragraph("AFFECTED PRODUCTS", label_style), Paragraph("ATTACK VECTOR", label_style)],
-        [Paragraph(f"<b>{prod_count} Products</b><br/><font size=9 color='#64748b'>Multiple Vendors</font>", body_style), Paragraph(f"<b>{attack_vector}</b><br/><font size=9 color='#64748b'>CVSS Vector Context</font>", body_style)]
-    ]
-    grid_table = Table(grid_data, colWidths=[250, 250])
+    grid_table = Table([[box1, box2, box3, box4]], colWidths=[130, 130, 130, 130])
     grid_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor("#e2e8f0")),
-        ('LINEABOVE', (0,2), (-1,2), 1, colors.HexColor("#e2e8f0")),
-        ('LINEBEFORE', (1,0), (1,-1), 1, colors.HexColor("#e2e8f0")),
-        ('PADDING', (0, 0), (-1, -1), 12),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('BOTTOMPADDING', (0,0), (-1,0), 2),
-        ('BOTTOMPADDING', (0,2), (-1,2), 2),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 10),
     ]))
     elements.append(grid_table)
     elements.append(Spacer(1, 20))
     
-    # CVSS Vector Block
-    if cvss_vector and cvss_vector != "Unknown":
-        vec_data = [[Paragraph(f"<font color='#64748b'><b>CVSS VECTOR</b></font>", ParagraphStyle('v1', fontSize=8)), Paragraph(cvss_vector, mono_blue)]]
-        vec_table = Table(vec_data, colWidths=[90, 410])
-        vec_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f1f5f9")),
-            ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#cbd5e1")),
-            ('PADDING', (0,0), (-1,-1), 8),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ]))
-        elements.append(vec_table)
-        elements.append(Spacer(1, 20))
+    # 3. Executive Summary & Details Table
+    p_exec_head = Paragraph("Executive Summary", body_bold)
+    p_exec_body = Paragraph(exec_summary, body_style)
+    
+    left_table = Table([[p_exec_head], [p_exec_body]], colWidths=[290])
+    left_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f8fafc")),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#e2e8f0")),
+        ('PADDING', (0,0), (-1,-1), 12),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+    ]))
+    
+    def cvss_extract(vec, key, mapping):
+        import re
+        m = re.search(f"{key}:([A-Z])", vec)
+        return mapping.get(m.group(1), "Unknown") if m else "Unknown"
 
-    # Affected Products List
-    elements.append(Paragraph(f"Affected Systems ({prod_count} total)", h2_style))
+    priv = cvss_extract(cvss_vector, "PR", {"N":"None", "L":"Low", "H":"High"})
+    ui = cvss_extract(cvss_vector, "UI", {"N":"None", "R":"Required"})
+    conf = cvss_extract(cvss_vector, "C", {"N":"None", "L":"Low", "H":"High"})
+    inte = cvss_extract(cvss_vector, "I", {"N":"None", "L":"Low", "H":"High"})
+    avail = cvss_extract(cvss_vector, "A", {"N":"None", "L":"Low", "H":"High"})
+
+    pub_date = cve.published_date.strftime('%Y-%m-%d') if cve.published_date else "N/A"
+    upd_date = cve.last_modified_date.strftime('%Y-%m-%d') if cve.last_modified_date else "N/A"
+    assigner = mitre_report.get("metadata", {}).get("assigner", "N/A") if mitre_report else "N/A"
+
+    right_data = [
+        [Paragraph("<font color='#64748b'><b>Published Date</b></font>", body_style), Paragraph(pub_date, body_style)],
+        [Paragraph("<font color='#64748b'><b>Updated Date</b></font>", body_style), Paragraph(upd_date, body_style)],
+        [Paragraph("<font color='#64748b'><b>Assigner</b></font>", body_style), Paragraph(assigner, body_style)],
+        [Paragraph("<font color='#64748b'><b>Vulnerability Type</b></font>", body_style), Paragraph(cwe_desc[:30], body_style)],
+        [Paragraph("<font color='#64748b'><b>Affected Component</b></font>", body_style), Paragraph(vendor_product[:30], body_style)],
+        [Paragraph("<font color='#64748b'><b>Privileges Required</b></font>", body_style), Paragraph(priv, body_style)],
+        [Paragraph("<font color='#64748b'><b>User Interaction</b></font>", body_style), Paragraph(ui, body_style)],
+        [Paragraph("<font color='#64748b'><b>Confidentiality Impact</b></font>", body_style), Paragraph(conf, body_style)],
+        [Paragraph("<font color='#64748b'><b>Integrity / Availability</b></font>", body_style), Paragraph(f"{inte} / {avail}", body_style)],
+    ]
+    right_table = Table(right_data, colWidths=[120, 100])
+    right_table.setStyle(TableStyle([
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#e2e8f0")),
+        ('PADDING', (0,0), (-1,-1), 8),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    
+    exec_split = Table([[left_table, right_table]], colWidths=[310, 230])
+    exec_split.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (0,0), 0),
+        ('RIGHTPADDING', (-1,-1), (-1,-1), 0),
+    ]))
+    elements.append(exec_split)
+    
+    # 4. Risk & Business Context
+    elements.append(Paragraph("Risk & Business Context", h2_style))
+    
+    has_exploit = "Unknown"
+    has_exploit_color = "#64748b"
+    if cve.references:
+        refs_str = json.dumps(cve.references).lower()
+        if "exploit" in refs_str or "poc" in refs_str:
+            has_exploit = "Possible"
+            has_exploit_color = "#f59e0b"
+            
+    pub_disc = "Yes" if len(cve.references or []) > 0 else "No"
+    pub_disc_color = "#10b981" if pub_disc == "Yes" else "#ef4444"
+    
+    rbc_data = [
+        [
+            Paragraph("<b>PUBLIC DISCLOSURE</b>", ParagraphStyle('lbl', fontSize=9, fontName="Helvetica-Bold", textColor=colors.HexColor("#0f172a"))),
+            Paragraph("<b>EXPLOIT STATUS</b>", ParagraphStyle('lbl', fontSize=9, fontName="Helvetica-Bold", textColor=colors.HexColor("#0f172a"))),
+            Paragraph("<b>VENDOR RESPONSE</b>", ParagraphStyle('lbl', fontSize=9, fontName="Helvetica-Bold", textColor=colors.HexColor("#0f172a"))),
+            Paragraph("<b>RELEASE MODEL</b>", ParagraphStyle('lbl', fontSize=9, fontName="Helvetica-Bold", textColor=colors.HexColor("#0f172a")))
+        ],
+        [
+            Paragraph(pub_disc, ParagraphStyle('val', fontSize=10, textColor=colors.HexColor(pub_disc_color))),
+            Paragraph(has_exploit, ParagraphStyle('val', fontSize=10, textColor=colors.HexColor(has_exploit_color))),
+            Paragraph("Unknown", ParagraphStyle('val', fontSize=10, textColor=colors.HexColor("#64748b"))),
+            Paragraph("Rolling release", ParagraphStyle('val', fontSize=10, textColor=colors.HexColor("#3b82f6"))),
+        ]
+    ]
+    rbc_table = Table(rbc_data, colWidths=[132.5, 132.5, 132.5, 132.5])
+    rbc_table.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#e2e8f0")),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
+        ('PADDING', (0,0), (-1,-1), 12),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(rbc_table)
+    
+    # 5. Recommended Actions
+    elements.append(Paragraph("Recommended Actions", h2_style))
+    
+    recs = []
+    if cve.ai_summary and "recommend" in cve.ai_summary.lower():
+        lines = cve.ai_summary.split('\n')
+        for l in lines:
+            if l.strip().startswith('-') or l.strip().startswith('*') or (len(l)>2 and l[0].isdigit() and l[1] == '.'):
+                recs.append(l.strip().lstrip('-*1234567890. '))
+    
+    if not recs:
+        recs = [
+            "Normalize and validate all file paths before file-system access.",
+            "Reject traversal sequences and enforce an allow-list of approved directories.",
+            "Restrict the application process to the minimum required file permissions.",
+            "Review application logs for suspicious path manipulation attempts.",
+            "Validate remediation against the upstream project because fixed-version details are unavailable."
+        ]
+        
+    rec_paragraphs = []
+    for i, r in enumerate(recs[:5], 1):
+        rec_paragraphs.append(Paragraph(f"{i}. {r}", body_style))
+        if i < len(recs[:5]):
+            rec_paragraphs.append(Spacer(1, 4))
+            
+    rec_cell = Table([[rec_paragraphs]], colWidths=[530])
+    rec_cell.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#f59e0b")),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#fffbeb")),
+        ('PADDING', (0,0), (-1,-1), 16),
+    ]))
+    elements.append(rec_cell)
+    
+    # ---------------- PAGE 2 ----------------
+    elements.append(PageBreak())
+    
+    elements.append(Paragraph("Technical Details & References", title_style))
+    elements.append(Spacer(1, 10))
+    
+    elements.append(Paragraph("CVSS 3.1 Vector", h2_style))
+    vec_table = Table([[Paragraph(f"<b>{cvss_vector}</b>", ParagraphStyle('vec', fontSize=10, textColor=colors.HexColor("#2563eb")))]], colWidths=[530])
+    vec_table.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#bfdbfe")),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#eff6ff")),
+        ('PADDING', (0,0), (-1,-1), 12),
+    ]))
+    elements.append(vec_table)
+    
+    elements.append(Paragraph("Affected Product", h2_style))
+    prod_data = [[
+        Paragraph("<b>PRODUCT</b>", ParagraphStyle('lbl', fontSize=8, textColor=colors.HexColor("#64748b"))),
+        Paragraph("<b>AFFECTED VERSION</b>", ParagraphStyle('lbl', fontSize=8, textColor=colors.HexColor("#64748b"))),
+        Paragraph("<b>PLATFORM</b>", ParagraphStyle('lbl', fontSize=8, textColor=colors.HexColor("#64748b"))),
+        Paragraph("<b>STATUS</b>", ParagraphStyle('lbl', fontSize=8, textColor=colors.HexColor("#64748b")))
+    ]]
     
     if mitre_report and mitre_report.get("affected", {}).get("products"):
-        for prod in mitre_report["affected"]["products"]:
-            elements.append(Paragraph(f"<b>{prod.get('vendor','')} {prod.get('product','')}</b>", body_style))
-            platforms = ", ".join(prod.get("platforms", [])) if prod.get("platforms") else "No platforms specified"
-            elements.append(Paragraph(f"<font color='#64748b'>Platforms: {platforms}</font>", body_style))
-            elements.append(Spacer(1, 4))
-            
-            if prod.get("versions"):
-                ver_table_data = []
-                for v in prod["versions"]:
-                    status_col = "#22c55e" if v.get("status") == "unaffected" else "#ef4444"
-                    ver_str = f"&ge; {v.get('version','*')}  &rarr;  &lt; {v.get('less_than','*')}"
-                    ver_table_data.append([
-                        Paragraph(ver_str, mono_style),
-                        Paragraph(f"<font color='{status_col}'><b>{v.get('status','affected').upper()}</b></font>", ParagraphStyle('status', fontName='Helvetica-Bold', fontSize=8, alignment=TA_CENTER))
-                    ])
-                vt = Table(ver_table_data, colWidths=[380, 80])
-                vt.setStyle(TableStyle([
-                    ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f8fafc")),
-                    ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
-                    ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
-                    ('PADDING', (0,0), (-1,-1), 6),
-                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-                ]))
-                elements.append(vt)
-            else:
-                elements.append(Paragraph("All versions affected.", body_style))
-            elements.append(Spacer(1, 15))
+        for p in mitre_report["affected"]["products"]:
+            versions = ", ".join([v.get("version", "") for v in p.get("versions", [])])
+            if not versions: versions = "N/A"
+            prod_data.append([
+                Paragraph(f"{p.get('vendor', '')} {p.get('product', '')}", body_style),
+                Paragraph(versions, body_style),
+                Paragraph("Not specified", body_style),
+                Paragraph("<b>AFFECTED</b>", ParagraphStyle('stat', fontSize=9, textColor=colors.HexColor("#ef4444")))
+            ])
     else:
-        # Fallback to CPEs
-        if cve.affected_products:
-            cpe_data = [[Paragraph(cpe, mono_style)] for cpe in cve.affected_products[:15]]
-            if cpe_data:
-                cpe_t = Table(cpe_data, colWidths=[500])
-                cpe_t.setStyle(TableStyle([
-                    ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f8fafc")),
-                    ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
-                    ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
-                    ('PADDING', (0,0), (-1,-1), 6),
-                ]))
-                elements.append(cpe_t)
-        else:
-            elements.append(Paragraph("No specific products listed.", body_style))
-            
-    elements.append(Spacer(1, 15))
+        prod_data.append([
+            Paragraph(vendor_product, body_style),
+            Paragraph("N/A", body_style),
+            Paragraph("Not specified", body_style),
+            Paragraph("<b>AFFECTED</b>", ParagraphStyle('stat', fontSize=9, textColor=colors.HexColor("#ef4444")))
+        ])
+        
+    prod_table = Table(prod_data, colWidths=[130, 200, 100, 100])
+    prod_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#f8fafc")),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#e2e8f0")),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
+        ('PADDING', (0,0), (-1,-1), 10),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+    ]))
+    elements.append(prod_table)
     
-    # References
-    if cve.references:
-        elements.append(Paragraph("Intel & Advisory References", h2_style))
-        for ref in cve.references[:10]:
-            elements.append(Paragraph(f"&bull; <a href='{ref}'>{ref}</a>", link_style))
-            elements.append(Spacer(1, 6))
-            
-    # Build doc
-    doc.build(elements, onFirstPage=_draw_mitre_report_footer, onLaterPages=_draw_mitre_report_footer)
+    elements.append(Paragraph("Vulnerability Description", h2_style))
+    desc_table = Table([[Paragraph(cve.description or "No description available.", body_style)]], colWidths=[530])
+    desc_table.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#e2e8f0")),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f8fafc")),
+        ('PADDING', (0,0), (-1,-1), 16),
+    ]))
+    elements.append(desc_table)
+    
+    elements.append(Paragraph("Intel & Advisory References", h2_style))
+    ref_data = [[
+        Paragraph("<b>SOURCE</b>", ParagraphStyle('lbl', fontSize=8, textColor=colors.HexColor("#64748b"))),
+        Paragraph("<b>REFERENCE</b>", ParagraphStyle('lbl', fontSize=8, textColor=colors.HexColor("#64748b"))),
+    ]]
+    
+    for ref in (cve.references or [])[:8]:
+        try:
+            import urllib.parse
+            domain = urllib.parse.urlparse(ref).netloc.replace("www.", "")
+        except:
+            domain = "Link"
+        ref_data.append([
+            Paragraph(domain, body_bold),
+            Paragraph(f"<a href='{ref}' color='#3b82f6'>{ref}</a>", ParagraphStyle('lnk', fontSize=9, textColor=colors.HexColor("#3b82f6"), fontName="Helvetica", wordWrap='CJK'))
+        ])
+        
+    if len(ref_data) == 1:
+        ref_data.append([Paragraph("N/A", body_style), Paragraph("No references available.", body_style)])
+        
+    ref_table = Table(ref_data, colWidths=[130, 400])
+    ref_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#f8fafc")),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#e2e8f0")),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
+        ('PADDING', (0,0), (-1,-1), 10),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(ref_table)
+    
+    elements.append(Spacer(1, 20))
+    disc_data = [[
+        Paragraph("<b>DISCLAIMER</b><br/><font color='#64748b'>This report is generated for vulnerability intelligence and informational purposes. Validate findings and remediation actions before operational use.</font>", ParagraphStyle('disc', fontSize=9, leading=12, textColor=colors.HexColor("#0f172a"))),
+        Paragraph("<b>CLASSIFICATION</b><br/><font color='#3b82f6'>Internal Use Only</font>", ParagraphStyle('class', fontSize=9, leading=12, textColor=colors.HexColor("#0f172a")))
+    ]]
+    disc_table = Table(disc_data, colWidths=[380, 150])
+    disc_table.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#e2e8f0")),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f8fafc")),
+        ('PADDING', (0,0), (-1,-1), 12),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+    ]))
+    elements.append(disc_table)
+
+    doc.build(elements, onFirstPage=_draw_cve_report_header_footer, onLaterPages=_draw_cve_report_header_footer)
     return file_path
 
 import datetime

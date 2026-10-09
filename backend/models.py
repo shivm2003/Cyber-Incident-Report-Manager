@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON
+from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey
 from database import Base
 import datetime
 
@@ -137,6 +137,36 @@ class CombinedReport(Base):
     cve_ids = Column(JSON)      # List of IDs
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+class AIGeneratedReport(Base):
+    __tablename__ = "ai_generated_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    report_title = Column(String(500), nullable=False)
+    command = Column(String, nullable=False)
+    content = Column(String, nullable=False)
+    incident_ids = Column(JSON, nullable=False, default=[])
+    cve_ids = Column(JSON, nullable=False, default=[])
+    sources = Column(JSON, nullable=False, default=[])
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class AIChatConversation(Base):
+    __tablename__ = "ai_chat_conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(500), nullable=False, default="New conversation")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+class AIChatMessage(Base):
+    __tablename__ = "ai_chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("ai_chat_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(20), nullable=False)
+    content = Column(String, nullable=False)
+    sources = Column(JSON, nullable=False, default=[])
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
 class CompanyProfile(Base):
     __tablename__ = "company_profiles"
 
@@ -186,3 +216,20 @@ class AutomationAuditLog(Base):
     impact_score = Column(Integer, default=0)
     details = Column(String(50000), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class CveGroup(Base):
+    __tablename__ = "cve_groups"
+
+    id = Column(Integer, primary_key=True, index=True)
+    group_name = Column(String)                          # Display name (product/vendor title-cased)
+    group_key = Column(String, unique=True, index=True)  # Normalized lowercase key for dedup
+    cve_ids = Column(JSON, default=[])                   # List of CVE ID strings in this group
+    total_cves = Column(Integer, default=0)
+    highest_cvss = Column(String, nullable=True)         # Max CVSS score string
+    highest_severity = Column(String, nullable=True)     # Severity of max CVSS
+    severity_breakdown = Column(JSON, default={})        # {"Critical": 2, "High": 1, ...}
+    jira_ticket_key = Column(String, nullable=True)      # Linked Jira ticket if pushed
+    jira_pushed_at = Column(DateTime, nullable=True)     # Timestamp when ticket was created
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow)

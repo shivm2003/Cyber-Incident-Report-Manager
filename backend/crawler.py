@@ -1,4 +1,4 @@
-import requests
+ import requests
 try:
     from bs4 import BeautifulSoup
 except ImportError:

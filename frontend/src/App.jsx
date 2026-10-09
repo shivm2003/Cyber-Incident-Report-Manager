@@ -4,8 +4,8 @@ import {
   Download, RefreshCw, AlertTriangle, Search, Filter,
   Terminal, BarChart2, FileText, ChevronRight, Zap,
   LayoutDashboard, ShieldCheck, Landmark, Settings,
-  ArrowUpRight, Info, AlertOctagon, Shield, X, Sun, Moon, ExternalLink, Database,
-  ArrowUpDown, ArrowUp, ArrowDown, Calendar, RotateCcw, Check, FileDown, History, Trash2, FilePlus, Bell, Send
+  ArrowUpRight, Info, AlertOctagon, Shield, X, Sun, Moon, ExternalLink, Database, Layers,
+  ArrowUpDown, ArrowUp, ArrowDown, Calendar, RotateCcw, Check, FileDown, History, Trash2, FilePlus, Bell, Send, Bot
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -32,6 +32,8 @@ import ManualReview from './pages/ManualReview';
 import TechInventory from './pages/TechInventory';
 import CVEReportViewer from './pages/CVEReportViewer';
 import JiraPublisher from './pages/JiraPublisher';
+import CVEGrouping from './pages/CVEGrouping';
+import AIReportStudio from './pages/AIReportStudio';
 
 const API_BASE = 'http://localhost:8000/api';
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -813,6 +815,10 @@ function App() {
           <Search size={18} color={view === 'cve_extractor' ? '#3b82f6' : 'inherit'} /> CVE Extractor
         </div>
 
+        <div className={`nav-item ${view === 'cve_grouping' ? 'active' : ''}`} onClick={() => setView('cve_grouping')}>
+          <Layers size={18} color={view === 'cve_grouping' ? '#6366f1' : 'inherit'} /> CVE Grouping
+        </div>
+
         <div className={`nav-item ${view === 'audit' ? 'active' : ''}`} onClick={() => setView('audit')}>
           <Terminal size={18} /> Intelligence Audit
         </div>
@@ -821,6 +827,10 @@ function App() {
 
         <div className={`nav-item ${view === 'report_builder' ? 'active' : ''}`} onClick={() => setView('report_builder')}>
           <FilePlus size={18} color={view === 'report_builder' ? '#6366f1' : 'inherit'} /> Report Builder
+        </div>
+
+        <div className={`nav-item ${view === 'ai_report_studio' ? 'active' : ''}`} onClick={() => setView('ai_report_studio')}>
+          <Bot size={18} color={view === 'ai_report_studio' ? '#00f2ff' : 'inherit'} /> AI Report Studio
         </div>
 
         <div className={`nav-item ${view === 'jira' ? 'active' : ''}`} onClick={() => setView('jira')}>
@@ -1020,6 +1030,8 @@ function App() {
 
           {view === 'audit' && <AuditLogs auditLogs={auditLogs} />}
 
+          {view === 'cve_grouping' && <CVEGrouping />}
+
           {view === 'report_builder' && (
             <ReportBuilder 
               reportBuilderData={reportBuilderData}
@@ -1037,6 +1049,8 @@ function App() {
               fetchReportBuilderPreview={fetchReportBuilderPreview}
             />
           )}
+
+          {view === 'ai_report_studio' && <AIReportStudio />}
 
           {view === 'impact' && (
             <ImpactReports 

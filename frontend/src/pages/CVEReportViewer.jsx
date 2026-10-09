@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Loader2, Loader, Save, AlertCircle, CheckCircle, ShieldAlert, Activity, GitBranch, Cpu, Database, Network, ChevronRight, Download, FileText, FileSpreadsheet, Clock, Trash2 } from 'lucide-react';
+import { Search, Loader2, Loader, Save, AlertCircle, CheckCircle, ShieldAlert, Activity, GitBranch, Cpu, Database, Network, ChevronRight, ChevronDown, Download, FileText, FileSpreadsheet, Clock, Trash2, Code } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -11,6 +11,7 @@ export default function CVEReportViewer({ extractorCveId, setExtractorCveId, isM
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [expandedProducts, setExpandedProducts] = useState({});
+    const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
     
     // History State
     const [history, setHistory] = useState([]);
@@ -543,7 +544,7 @@ export default function CVEReportViewer({ extractorCveId, setExtractorCveId, isM
                         <div style={{ flex: 1, marginTop: '20px' }}>
                             <div style={styles.headerLabel}>Vulnerability Report</div>
                             <h1 style={styles.headerTitle}>{report.vulnerability.title || "No Title Available"}</h1>
-                            <div style={styles.headerCve}>{report.metadata.cve_id} • {report.metadata.assigner} • {report.metadata.state}</div>
+                            <div style={styles.headerCve}>{report.metadata.cve_id} • {report.metadata.assigner} • {report.metadata.state} • Published: {report.metadata.date_published?.split('T')[0] || 'N/A'}</div>
                         </div>
                         {report.scoring.cvss_score && (
                             <div style={{ ...styles.cvssBadge(report.scoring.cvss_severity), marginTop: '20px' }}>
@@ -679,6 +680,83 @@ export default function CVEReportViewer({ extractorCveId, setExtractorCveId, isM
                             </div>
                         </section>
                     )}
+
+                    {/* Additional Information - Full API Response */}
+                    <section style={styles.section}>
+                        <div 
+                            onClick={() => setShowAdditionalInfo(!showAdditionalInfo)}
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between', 
+                                cursor: 'pointer', 
+                                padding: '12px 16px', 
+                                background: '#f5f5f5', 
+                                borderRadius: '8px', 
+                                border: '1px solid #e5e5e5',
+                                transition: 'all 0.2s ease',
+                                userSelect: 'none'
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Code size={16} style={{ color: '#378ADD' }} />
+                                <h2 style={{ ...styles.h2, margin: 0 }}>Additional Information</h2>
+                            </div>
+                            <ChevronDown 
+                                size={16} 
+                                style={{ 
+                                    color: '#666', 
+                                    transition: 'transform 0.3s ease', 
+                                    transform: showAdditionalInfo ? 'rotate(180deg)' : 'rotate(0deg)' 
+                                }} 
+                            />
+                        </div>
+                        {showAdditionalInfo && (
+                            <div style={{ 
+                                marginTop: '12px', 
+                                background: '#1a1a2e', 
+                                borderRadius: '8px', 
+                                padding: '16px', 
+                                border: '1px solid #2d2d44',
+                                position: 'relative'
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Full API Response (JSON)</span>
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigator.clipboard.writeText(JSON.stringify({ status: 'success', report: report }, null, 2));
+                                        }}
+                                        style={{ 
+                                            background: 'rgba(55, 138, 221, 0.15)', 
+                                            color: '#378ADD', 
+                                            border: '1px solid rgba(55, 138, 221, 0.3)', 
+                                            padding: '4px 10px', 
+                                            borderRadius: '4px', 
+                                            cursor: 'pointer', 
+                                            fontSize: '11px', 
+                                            fontWeight: 600 
+                                        }}
+                                    >
+                                        Copy JSON
+                                    </button>
+                                </div>
+                                <pre style={{ 
+                                    margin: 0, 
+                                    fontSize: '12px', 
+                                    fontFamily: '"Courier New", Consolas, monospace', 
+                                    color: '#e0e0e0', 
+                                    whiteSpace: 'pre-wrap', 
+                                    wordBreak: 'break-word', 
+                                    lineHeight: 1.6,
+                                    maxHeight: '500px',
+                                    overflowY: 'auto'
+                                }}>
+                                    {JSON.stringify({ status: 'success', report: report }, null, 2)}
+                                </pre>
+                            </div>
+                        )}
+                    </section>
 
                     <div style={{ borderTop: '1px solid #e5e5e5', paddingTop: '1.5rem', color: '#666', fontSize: '12px' }}>
                         <p>This report was extracted directly from MITRE CVE Records and automatically saved to your Vulnerability Database.</p>

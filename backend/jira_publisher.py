@@ -20,20 +20,30 @@ def create_jira_issue(
         raise ValueError("Missing JIRA credentials in environment variables")
 
     def text_to_adf(text_str: str) -> dict:
+        MAX_LEN = 32000
+        if len(text_str) > MAX_LEN:
+            text_str = text_str[:MAX_LEN] + "\n\n... [TRUNCATED DUE TO JIRA CHARACTER LIMIT]"
+            
         paragraphs = []
         for line in text_str.split("\n"):
             line = line.strip()
             if not line:
                 continue
-            paragraphs.append({
-                "type": "paragraph",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": line
-                    }
-                ]
-            })
+            
+            # A single text node also has a 32768 length limit, so we chunk long lines
+            chunk_size = 32000
+            chunks = [line[i:i+chunk_size] for i in range(0, len(line), chunk_size)]
+            
+            for chunk in chunks:
+                paragraphs.append({
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": chunk
+                        }
+                    ]
+                })
         if not paragraphs:
             paragraphs.append({
                 "type": "paragraph",

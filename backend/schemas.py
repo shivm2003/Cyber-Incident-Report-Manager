@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 class IncidentBase(BaseModel):
@@ -180,6 +180,27 @@ class CombinedReportResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class AIReportChatRequest(BaseModel):
+    question: str
+    history: list[dict] = Field(default_factory=list)
+
+class AIReportGenerateRequest(BaseModel):
+    report_title: str
+    command: str
+    incident_ids: list[int] = Field(default_factory=list)
+    cve_ids: list[int] = Field(default_factory=list)
+
+class AIReportCandidatesRequest(BaseModel):
+    from_date: str
+    to_date: str
+    limit: int = 100
+
+class AIChatConversationCreateRequest(BaseModel):
+    title: str | None = None
+
+class AIChatMessageCreateRequest(BaseModel):
+    question: str
 
 class TechItem(BaseModel):
     name: str
@@ -479,3 +500,24 @@ class AutomationRunRequest(BaseModel):
     nvd_timeframe: str = "month"
     run_incident: bool = True
     incident_timeframe: str = "week"
+
+class FilteredDownloadRequest(BaseModel):
+    cve_ids: list[str]
+
+class CveGroupResponse(BaseModel):
+    id: int
+    group_name: str
+    group_key: str
+    cve_ids: list[str] = []
+    total_cves: int = 0
+    highest_cvss: str | None = None
+    highest_severity: str | None = None
+    severity_breakdown: dict = {}
+    jira_ticket_key: str | None = None
+    jira_pushed_at: datetime | None = None
+    created_at: datetime
+
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

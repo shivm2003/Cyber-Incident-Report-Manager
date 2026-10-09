@@ -1,0 +1,28 @@
+[
+  {
+    "incident_id": "INC-2026-001",
+    "title": "Repeated failed login attempts",
+    "category": "Authentication",
+    "severity": "Medium",
+    "status": "Open",
+    "first_seen": "2026-10-05",
+    "asset": "customer-portal-staging",
+    "description": "Crawler observed repeated failed sign-in responses for one test account. The available record does not confirm successful account access.",
+    "evidence": "HTTP 401 response observed in the crawl output; no request/response pair is attached to this example.",
+    "source_url": "https://example.invalid/incidents/INC-2026-001",
+    "recommended_next_step": "Review authentication rate limiting and correlate with server-side logs."
+  },
+  {
+    "incident_id": "INC-2026-002",
+    "title": "Missing security header on an application response",
+    "category": "Security Configuration",
+    "severity": "Low",
+    "status": "Triaged",
+    "first_seen": "2026-10-06",
+    "asset": "customer-portal-staging",
+    "description": "The crawler export reports that the Content-Security-Policy header was not present on the sampled response.",
+    "evidence": "Header observation from the crawler record; endpoint coverage is limited to the sampled URL.",
+    "source_url": "https://example.invalid/incidents/INC-2026-002",
+    "recommended_next_step": "Confirm the observation on representative pages and define a suitable policy with the application owner."
+  }
+]

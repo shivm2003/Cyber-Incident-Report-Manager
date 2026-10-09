@@ -202,16 +202,23 @@ Breach Method: ${report.breach_method || 'N/A'}`;
       const cve = cveReports.find(c => c.metadata.cve_id === reportId);
       if (cve) {
         const products = cve.affected?.products || [];
-        const foundProduct = products.length > 0 ? `${products[0].vendor} ${products[0].product}`.trim() : '';
+        const foundProduct = products.length > 0 ? products[0].product.trim() : '';
         setManualProductName(foundProduct);
         setSummary(`[Vulnerability Batch] ${foundProduct || 'Unknown Product'} — 1 CVE Detected`);
         
         const desc = `CVE ID: ${cve.metadata.cve_id}\n` +
+          `Published: ${cve.metadata.date_published?.split('T')[0] || 'N/A'}\n` +
+          `Updated: ${cve.metadata.date_updated?.split('T')[0] || 'N/A'}\n` +
+          `Assigner: ${cve.metadata.assigner || 'N/A'}\n` +
           `Severity: ${cve.scoring?.cvss_severity || 'Unknown'} (${cve.scoring?.cvss_score || 'N/A'})\n` +
           `CVSS Vector: ${cve.scoring?.cvss_vector || 'N/A'}\n\n` +
           `Description:\n${cve.vulnerability?.description || 'No description available.'}\n\n` +
+          `CWE:\n` +
+          (cve.vulnerability?.cwes?.map(c => `- ${c.id}: ${c.description}`).join('\n') || '- N/A') + `\n\n` +
           `Affected Products:\n` +
-          (cve.affected?.products?.map(p => `- ${p.vendor} ${p.product} (versions: ${p.versions?.map(v => `${v.version} to ${v.less_than}`).join(', ') || 'N/A'})`).join('\n') || '- None listed');
+          (cve.affected?.products?.map(p => `- ${p.vendor} ${p.product} (versions: ${p.versions?.map(v => `${v.version} to ${v.less_than}`).join(', ') || 'N/A'})`).join('\n') || '- None listed') + `\n\n` +
+          `References:\n` +
+          (cve.references?.map(r => `- ${r.url}`).join('\n') || '- None');
         setDescription(desc);
         
         setImpact(`CVSS Score: ${cve.scoring?.cvss_score || 'N/A'} | Severity: ${cve.scoring?.cvss_severity || 'Unknown'}`);

@@ -2,7 +2,7 @@ import React from 'react';
 import { formatIST, formatISTDate, formatISTTime } from '../utils/dateUtils';
 import { 
   ShieldAlert, Activity, Globe, MapPin, Search, Filter, 
-  RotateCcw, X, Zap, RefreshCw, FileText, Database, AlertOctagon
+  RotateCcw, X, Zap, RefreshCw, FileText, Database, AlertOctagon, ChevronDown, Trash2
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -53,22 +53,25 @@ const Dashboard = ({
         title={view === 'india' ? "India Incidents" : "Global Threats"} 
         value={view === 'india' ? stats.india : stats.total} 
         icon={view === 'india' ? MapPin : Globe} 
-        color="var(--primary)" 
+        color="#3b82f6" 
         detail={`${stats.new_24h} new in 24h`}
+        sparkType="line"
       />
       <StatCard 
         title="Critical Risks" 
         value={stats.severity.Critical} 
         icon={ShieldAlert} 
-        color="#ff4d4d" 
-        detail="Immediate action req"
+        color="#ef4444" 
+        detail="Immediate action required"
+        sparkType="bars"
       />
       <StatCard 
         title="Financial Impact" 
         value={stats.financial_total} 
         icon={Activity} 
-        color="#fbbf24" 
+        color="#f59e0b" 
         detail={`${stats.india_financial} in India`}
+        sparkType="wave"
       />
       <StatCard 
         title="Intelligence Coverage" 
@@ -76,6 +79,7 @@ const Dashboard = ({
         icon={Zap} 
         color="#8b5cf6" 
         detail="Active monitoring"
+        sparkType="wave"
       />
     </div>
   );
@@ -84,74 +88,98 @@ const Dashboard = ({
     <div className="fade-in">
       {renderStats()}
 
-      <div className="charts-container" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginTop: '24px' }}>
-        <div className="glass-card" style={{ height: '350px', padding: '24px' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '20px', color: 'var(--text-muted)' }}>THREAT VELOCITY</h3>
-          <ResponsiveContainer width="100%" height="100%">
+      <div className="charts-container" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', marginTop: '0' }}>
+        <div className="chart-card" style={{ height: '350px' }}>
+          <div className="chart-card-header">
+            <h3 className="chart-card-title">Threat Velocity</h3>
+            <select className="chart-dropdown">
+              <option>This Week</option>
+              <option>This Month</option>
+              <option>This Year</option>
+            </select>
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
             <AreaChart data={geoData}>
               <defs>
                 <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={10} />
-              <YAxis stroke="var(--text-muted)" fontSize={10} />
-              <RechartsTooltip contentStyle={{ background: 'var(--bg-sidebar)', border: '1px solid var(--border)' }} />
-              <Area type="monotone" dataKey="value" stroke="#6366f1" fillOpacity={1} fill="url(#colorVal)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" vertical={false} />
+              <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} axisLine={false} />
+              <RechartsTooltip 
+                contentStyle={{ 
+                  background: 'var(--bg-sidebar)', 
+                  border: '1px solid var(--border)', 
+                  borderRadius: '10px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                  fontSize: '12px',
+                  fontWeight: 600
+                }} 
+              />
+              <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorVal)" dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <div className="glass-card" style={{ height: '350px', padding: '24px' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '20px', color: 'var(--text-muted)' }}>SEVERITY DISTRIBUTION</h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={severityData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                {severityData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={SEVERITY_COLORS[entry.name] || '#8884d8'} />
-                ))}
-              </Pie>
-              <RechartsTooltip />
-              <Legend verticalAlign="bottom" height={36}/>
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="intel-header" style={{ marginTop: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ background: 'var(--primary-glow)', padding: '8px', borderRadius: '10px' }}>
-            <Activity size={20} color="var(--primary)" />
+        <div className="chart-card" style={{ height: '350px' }}>
+          <div className="chart-card-header">
+            <h3 className="chart-card-title">Severity Distribution</h3>
           </div>
-          <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 900, color: 'var(--text-main)' }}>Intelligence Command Feed</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-              <span className="badge-live">LIVE COMMAND</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Real-time synchronization active</span>
+          <div style={{ position: 'relative', width: '100%', height: '260px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={severityData} innerRadius={70} outerRadius={95} paddingAngle={3} dataKey="value" cx="50%" cy="45%">
+                  {severityData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={SEVERITY_COLORS[entry.name] || '#8884d8'} />
+                  ))}
+                </Pie>
+                <RechartsTooltip />
+                <Legend 
+                  verticalAlign="bottom" 
+                  height={40}
+                  formatter={(value, entry) => (
+                    <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600 }}>
+                      {value} ({entry.payload.value})
+                    </span>
+                  )}
+                  iconType="circle"
+                  iconSize={8}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            {/* Center label */}
+            <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
+              <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1 }}>
+                {severityData.reduce((sum, d) => sum + d.value, 0)}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, marginTop: '4px' }}>Total</div>
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', background: 'var(--bg-elevated)', borderRadius: '12px', padding: '4px', border: '1px solid var(--border)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)' }}>
-             {['today', 'yesterday', 'week', 'month'].map(t => (
+      </div>
+
+      <div className="intel-feed-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '10px', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
+            <ShieldAlert size={22} color="#3b82f6" />
+          </div>
+          <div>
+            <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.3px' }}>Intelligence Command Feed</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+              <span className="badge-live">LIVE COMMAND</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>· Real-time synchronization active</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-elevated)', borderRadius: '10px', padding: '3px', border: '1px solid var(--border)' }}>
+             {['Today', 'Yesterday', 'Week', 'Month'].map(t => (
                <button 
                  key={t}
-                 onClick={(e) => { e.stopPropagation(); setTimeframe(t); handleCollect('rss', t); }}
-                 className={`timeframe-btn ${timeframe === t ? 'active' : ''}`}
-                 style={{ 
-                   fontSize: '10px', 
-                   padding: '8px 16px', 
-                   textTransform: 'uppercase', 
-                   fontWeight: 800,
-                   background: timeframe === t ? 'var(--primary)' : 'transparent',
-                   color: timeframe === t ? '#000' : 'var(--text-muted)',
-                   borderRadius: '10px',
-                   border: 'none',
-                   cursor: 'pointer',
-                   transition: 'all 0.2s ease',
-                   letterSpacing: '0.5px'
-                 }}
+                 onClick={(e) => { e.stopPropagation(); setTimeframe(t.toLowerCase()); handleCollect('rss', t.toLowerCase()); }}
+                 className={`timeframe-btn ${timeframe === t.toLowerCase() ? 'active' : ''}`}
                >
                  {t}
                </button>
@@ -165,18 +193,18 @@ const Dashboard = ({
             style={{ padding: '10px 20px', fontSize: '12px', height: '40px', background: 'linear-gradient(135deg, #a855f7, #6366f1)' }}
           >
             {collecting ? <RefreshCw size={14} className="animate-spin" style={{ marginRight: '8px' }} /> : <Zap size={14} style={{ marginRight: '8px' }} />} 
-            {collecting ? 'Crawling RSS...' : 'Sync Feed Intel'}
+            {collecting ? 'Crawling...' : 'Sync Feed Intel'}
           </button>
           <button 
             className="btn-ghost" 
             onClick={() => setShowFilters(!showFilters)}
-            style={{ border: showFilters ? '1px solid var(--primary)' : '1px solid var(--border)', background: showFilters ? 'var(--primary-glow)' : 'var(--bg-elevated)', height: '40px', fontSize: '12px' }}
+            style={{ border: showFilters ? '1px solid var(--primary)' : '1px solid var(--border)', background: showFilters ? 'var(--primary-glow)' : 'var(--bg-elevated)', height: '40px', width: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 'unset' }}
           >
-            <Filter size={14} />
+            <Filter size={16} />
           </button>
 
           <div className="search-box" style={{ height: '40px' }}>
-            <Search size={14} />
+            <Search size={14} color="var(--text-muted)" />
             <input 
               type="text" 
               placeholder="Search feed..." 
@@ -360,7 +388,7 @@ const Dashboard = ({
                       onClick={(e) => { e.stopPropagation(); handleDeleteIncident(inc.id); }}
                       style={{ padding: '6px', color: '#ff4d4d', background: 'rgba(255, 77, 77, 0.1)', borderColor: 'rgba(255, 77, 77, 0.2)', minWidth: 'unset', width: '32px', height: '32px' }}
                     >
-                      <X size={14} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </td>
